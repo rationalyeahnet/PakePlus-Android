@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 移动端自适应核心 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>有道单词发音批量下载器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            max-width: 480px;
+            width: 96%;
+            margin: 20px auto;
+            padding: 16px;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            box-shadow: 0 0 12px #eee;
+            border-radius: 8px;
+        }
+        h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            text-align: center;
+            font-size: 18px;
+        }
+        textarea {
+            width: 100%;
+            height: 130px;
+            padding: 10px;
+            margin-bottom: 10px;
+            resize: vertical;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #00b488;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-bottom: 8px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #009973;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .mini-btn {
+            padding: 6px;
+            font-size: 13px;
+            background: #777;
+        }
+        #logBox {
+            margin-top: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 180px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            color: #333;
+            background: #fafafa;
+        }
+        .tip {
+            font-size: 11px;
+            color: #e63946;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        /* 单词卡片容器：取消内部滚动，页面整体滚动 */
+        .word-card-wrap {
+            margin: 10px 0;
+            border:1px solid #ddd;
+            padding:10px;
+            border-radius:6px;
+            background:#f8f8f8;
+        }
+        .word-card {
+            border:1px solid #ccc;
+            border-radius:6px;
+            padding:10px;
+            margin-bottom:8px;
+            background:#fff;
+        }
+        .word-title {
+            font-weight:bold;
+            font-size:15px;
+            margin-bottom:8px;
+        }
+        .audio-row {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:6px 0;
+        }
+        .play-btn {
+            width:auto;
+            padding:4px 10px;
+            font-size:13px;
+            margin-bottom:0;
+            background:#4a90e2;
+        }
+        .download-all-btn {
+            background:#f28c28;
+            margin-top:10px;
+        }
+        .error-text {
+            color: #d93025;
+            font-weight: bold;
+            padding: 6px 0;
+        }
+        /* 手机小屏幕进一步缩小尺寸 */
+        @media (max-width: 360px) {
+            body {
+                padding: 12px;
+            }
+            textarea {
+                height: 110px;
+            }
+            #logBox {
+                height: 150px;
+            }
+            button {
+                padding: 10px;
+                font-size: 15px;
+            }
+            .audio-row {
+                flex-wrap:wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h3>🎧 有道发音下载器</h3>
+    <textarea id="wordInput" placeholder="输入要查询的单词，每行一个
+例如：
+apple
+banana
+orange"></textarea>
+    <button id="parseBtn">生成试听卡片</button>
+    <button class="mini-btn" id="clearLogBtn">清空日志</button>
+
+    <!-- 动态单词卡片容器：取消内部滚动，超长内容由页面整体滚动 -->
+    <div class="word-card-wrap" id="cardContainer" style="display:none;"></div>
+    <!-- 批量下载选中发音按钮 -->
+    <button id="downloadSelectBtn" class="download-all-btn" style="display:none;">下载所有勾选发音</button>
+
+    <div id="logBox">【系统】准备就绪</div>
+    <div class="tip">超爱老婆，么么哒！</div>
+
+    <script>
+        const wordInput = document.getElementById('wordInput');
+        const parseBtn = document.getElementById('parseBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const logBox = document.getElementById('logBox');
+        const cardContainer = document.getElementById('cardContainer');
+        const downloadSelectBtn = document.getElementById('downloadSelectBtn');
+
+        // 全局存储单词列表
+        let wordList = [];
+
+        // 日志追加函数
+        function addLog(text) {
+            const now = new Date().toLocaleTimeString();
+            logBox.textContent += `\n[${now}] ${text}`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // 清空日志
+        clearLogBtn.addEventListener('click', () => {
+            logBox.textContent = '【系统】日志已清空';
+        });
+
+        // 校验音频是否有效（时长>0.1s才算有发音）
+        function checkAudioValid(url) {
+            return new Promise((resolve) => {
+                const audio = new Audio(url);
+                audio.addEventListener('loadedmetadata', () => {
+                    resolve(audio.duration > 0.1);
+                });
+                audio.addEventListener('error', () => resolve(false));
+                audio.src = url;
+            });
+        }
+
+        // 播放音频
+        window.playAudio = async function(word, type) {
+            const encodeWord = encodeURIComponent(word);
+            const url = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=${type}`;
+            const isValid = await checkAudioValid(url);
+            if (!isValid) {
+                addLog(`❌ 【${word}】${type===1?'英式':'美式'}发音不存在`);
+                return;
+            }
+            const audio = new Audio(url);
+            audio.play();
+            addLog(`▶️ 播放【${word}】${type===1?'英式':'美式'}发音`);
+        }
+
+        // 批量校验单词，生成卡片
+        async function renderWordCards(words) {
+            wordList = words;
+            cardContainer.innerHTML = '';
+            addLog(`⏳ 正在校验单词发音有效性，请稍候...`);
+
+            for (let idx = 0; idx < words.length; idx++) {
+                const word = words[idx];
+                const encodeWord = encodeURIComponent(word);
+                const urlUk = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=1`;
+                const urlUs = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=2`;
+
+                // 同时校验英美发音
+                const [hasUk, hasUs] = await Promise.all([
+                    checkAudioValid(urlUk),
+                    checkAudioValid(urlUs)
+                ]);
+
+                const card = document.createElement('div');
+                card.className = 'word-card';
+                card.innerHTML = `<div class="word-title">单词：${word}</div>`;
+
+                // 两种发音全部无效：显示错误提示，不渲染单选与按钮
+                if (!hasUk && !hasUs) {
+                    card.innerHTML += `<div class="error-text">单词可能输入错误，请检查！</div>`;
+                    addLog(`⚠️ 单词【${word}】无英美发音，判定为错误单词`);
+                } else {
+                    // 存在有效发音，渲染单选+试听按钮
+                    card.innerHTML += `
+                        <div class="audio-row">
+                            <input type="radio" name="radio_${idx}" value="uk" id="uk_${idx}" ${hasUk ? '' : 'disabled'}>
+                            <label for="uk_${idx}">英式发音</label>
+                            <button class="play-btn" onclick="playAudio('${word}',1)" ${hasUk ? '' : 'disabled'}>试听英音</button>
+                        </div>
+                        <div class="audio-row">
+                            <input type="radio" name="radio_${idx}" value="us" id="us_${idx}" ${hasUs ? '' : 'disabled'}>
+                            <label for="us_${idx}">美式发音</label>
+                            <button class="play-btn" onclick="playAudio('${word}',2)" ${hasUs ? '' : 'disabled'}>试听美音</button>
+                        </div>
+                    `;
+                }
+                cardContainer.appendChild(card);
+            }
+
+            cardContainer.style.display = 'block';
+            downloadSelectBtn.style.display = 'block';
+            addLog(`✅ 全部校验完成，已生成${words.length}个单词卡片`);
+        }
+
+        // 前端下载音频文件
+        function saveAudioFile(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        // 请求音频接口（增加有效性校验）
+        async function downloadAudio(url, filename) {
+            try {
+                addLog(`请求资源：${url}`);
+                const valid = await checkAudioValid(url);
+                if (!valid) {
+                    addLog(`❌ 【${filename}】无有效发音资源，跳过下载`);
+                    return false;
+                }
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) throw new Error(`HTTP状态码: ${res.status}`);
+                const blob = await res.blob();
+                saveAudioFile(blob, filename);
+                addLog(`✅ 成功: ${filename}`);
+                return true;
+            } catch (err) {
+                addLog(`❌ 失败 [${filename}] 错误信息: ${err.message}`);
+                return false;
+            }
+        }
+
+        // 解析单词，开始校验渲染卡片
+        parseBtn.addEventListener('click', async function () {
+            const text = wordInput.value.trim();
+            if (!text) {
+                addLog(`⚠️ 错误：未输入任何单词`);
+                return;
+            }
+            const words = text.split('\n').map(w => w.trim()).filter(w => w !== '');
+            if (words.length === 0) {
+                addLog(`⚠️ 错误：未检测到有效单词`);
+                return;
+            }
+            addLog(`🚀 解析完成，有效单词数量：${words.length}`);
+            parseBtn.disabled = true;
+            await renderWordCards(words);
+            parseBtn.disabled = false;
+        });
+
+        // 批量下载勾选的发音
+        downloadSelectBtn.addEventListener('click', async function () {
+            downloadSelectBtn.disabled = true;
+            parseBtn.disabled = true;
+            addLog(`——————————————————`);
+            let downloadTotal = 0;
+            let skipCount = 0;
+
+            for (let i = 0; i < wordList.length; i++) {
+                const word = wordList[i];
+                const lowerWord = word.toLowerCase();
+                const checkRadio = document.querySelector(`input[name="radio_${i}"]:checked`);
+                if (!checkRadio) {
+                    addLog(`⏭️ 单词【${word}】未选择发音，跳过`);
+                    skipCount++;
+                    continue;
+                }
+                const selectType = checkRadio.value;
+                addLog(`⏳ 处理单词(${i+1}/${wordList.length})：${word}，选中${selectType==='uk'?'英音':'美音'}`);
+                const encodeWord = encodeURIComponent(word);
+                let fileName = '';
+                let audioUrl = '';
+                if (selectType === 'uk') {
+                    fileName = `${lowerWord}.mp3`;
+                    audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=1`;
+                } else {
+                    fileName = `${lowerWord}_读音.mp3`;
+                    audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=2`;
+                }
+                const success = await downloadAudio(audioUrl, fileName);
+                if (success) downloadTotal++;
+            }
+            addLog(`🎉 下载任务结束！成功下载${downloadTotal}个音频，${skipCount}个单词未勾选已跳过`);
+            downloadSelectBtn.disabled = false;
+            parseBtn.disabled = false;
+        });
+    </script>
+</body>
+</html>
