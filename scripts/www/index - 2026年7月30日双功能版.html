@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 移动端自适应核心 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>有道单词发音批量下载器</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; } /* 全局重置 */
+    body {
+        max-width: 480px; width: 96%; margin: 20px auto; padding: 16px;
+        font-family: 'Segoe UI', Tahoma, sans-serif; box-shadow: 0 0 12px #eee;
+        border-radius: 8px; background: #fff;
+    }
+    h3 { margin: 0 0 15px 0; color: #333; text-align: center; font-size: 18px; }
+    
+    /* Tab 切换样式 */
+    .tab-container { 
+        display: flex; 
+        margin-bottom: 10px; 
+        border-radius: 6px; 
+        overflow: hidden; 
+        border: 1px solid #a5d6d1; 
+        font-size: 0; 
+    }
+    .tab-btn { 
+        flex: 1; 
+        padding: 10px; 
+        text-align: center; 
+        font-size: 14px; 
+        cursor: pointer; 
+        background: #e0f2f1; 
+        color: #00695c; 
+        transition: 0.3s; 
+        border: none; 
+        outline: none; 
+        margin: 0; 
+        border-right: 1px solid #a5d6d1; 
+    }
+    .tab-btn:last-child { border-right: none; } 
+    .tab-btn.active { background: #00b488; color: #fff; font-weight: bold; }
+
+    textarea {
+        width: 100%; padding: 10px; margin-bottom: 10px; resize: vertical;
+        border: 1px solid #ccc; border-radius: 4px; font-size: 14px; height: 130px;
+    }
+    button {
+        width: 100%; padding: 12px; background-color: #00b488; color: white;
+        border: none; border-radius: 4px; cursor: pointer; font-size: 16px;
+        transition: background-color 0.3s; margin-bottom: 8px;
+    }
+    button:hover:not(:disabled) { background-color: #009973; }
+    button:disabled { background-color: #cccccc; cursor: not-allowed; }
+    
+    /* 小按钮样式 (现在占满一整行) */
+    .mini-btn { 
+        padding: 8px; 
+        font-size: 13px; 
+        background: #777; 
+        margin-bottom: 8px; 
+    }
+    .mini-btn:hover:not(:disabled) { background: #666; }
+
+    #logBox {
+        margin-top: 12px; margin-bottom: 8px; /* 给下方的清空日志按钮留出一点间距 */
+        border: 1px solid #ddd; border-radius: 4px; padding: 10px;
+        height: 180px; overflow-y: auto; font-size: 12px; white-space: pre-wrap;
+        line-height: 1.5; color: #333; background: #fafafa;
+    }
+    .tip { font-size: 11px; color: #e63946; margin-top: 8px; line-height: 1.4; text-align: center;}
+    
+    /* 单词卡片容器 */
+    .word-card-wrap { margin: 10px 0; border: 1px solid #ddd; padding: 10px; border-radius: 6px; background: #f8f8f8; }
+    .word-card { border: 1px solid #ccc; border-radius: 6px; padding: 10px; margin-bottom: 8px; background: #fff; }
+    .word-title { font-weight: bold; font-size: 15px; margin-bottom: 8px; }
+    .audio-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .play-btn { width: auto; padding: 4px 10px; font-size: 13px; margin-bottom: 0; background: #4a90e2; }
+    .download-all-btn { background: #f28c28; margin-top: 10px; }
+    .error-text { color: #d93025; font-weight: bold; padding: 6px 0; }
+
+    @media (max-width: 360px) {
+        body { padding: 12px; }
+        textarea { height: 110px; }
+        #logBox { height: 150px; }
+        button { padding: 10px; font-size: 15px; }
+        .audio-row { flex-wrap: wrap; }
+    }
+</style>
+</head>
+<body>
+    <h3>🎧 有道发音下载器</h3>
+    
+    <!-- Tab 切换 -->
+    <div class="tab-container">
+        <button class="tab-btn" id="tabWord">查词模式</button>
+        <button class="tab-btn active" id="tabText">文本取词模式</button>
+    </div>
+
+    <!-- 唯一输入框 -->
+    <textarea id="mainInput" placeholder="粘贴中英文混合的文章或段落&#10;系统会自动提取所有英文单词并去重&#10;例如：&#10;今天天气很好，我们去 park 散步吧。这里的 scenery 非常 beautiful。"></textarea>
+
+
+    <button id="parseBtn">生成试听卡片</button>
+    
+    <button class="mini-btn" id="clearInputBtn">清空输入</button>
+
+    <!-- 动态单词卡片容器 -->
+    <div class="word-card-wrap" id="cardContainer" style="display:none;"></div>
+    <button id="downloadSelectBtn" class="download-all-btn" style="display:none;">下载所有勾选发音</button>
+    
+    <!-- 日志框 -->
+    <div id="logBox">【系统】准备就绪</div>
+    
+    <!-- 调整位置：清空日志按钮移到了日志框下方 -->
+    <button class="mini-btn" id="clearLogBtn">清空日志</button>
+
+    <div class="tip">超爱老婆，么么哒！</div>
+
+<script>
+    // 获取 DOM 元素
+    const mainInput = document.getElementById('mainInput');
+    const tabWord = document.getElementById('tabWord');
+    const tabText = document.getElementById('tabText');
+    const parseBtn = document.getElementById('parseBtn');
+    const clearLogBtn = document.getElementById('clearLogBtn');
+    const clearInputBtn = document.getElementById('clearInputBtn');
+    const logBox = document.getElementById('logBox');
+    const cardContainer = document.getElementById('cardContainer');
+    const downloadSelectBtn = document.getElementById('downloadSelectBtn');
+
+    // 全局状态
+    let wordList = [];
+    let targetDirEntry = null;
+    const FOLDER_NAME = "EnglishAudio"; 
+
+    // --- Tab 切换逻辑 (不再切换DOM，只切换属性) ---
+    tabWord.addEventListener('click', () => {
+        tabWord.classList.add('active');
+        tabText.classList.remove('active');
+        mainInput.placeholder = "输入要查询的单词，每行一个\n例如：\nred\ngreen\nblue";
+    });
+    tabText.addEventListener('click', () => {
+        tabText.classList.add('active');
+        tabWord.classList.remove('active');
+        mainInput.placeholder = "粘贴中英文混合的文章或段落\n系统会自动提取所有英文单词并去重\n例如：\n今天天气很好，我们去 park 散步吧。这里的 scenery 非常 beautiful。";
+    });
+
+    // 日志追加函数
+    function addLog(text) {
+        const now = new Date().toLocaleTimeString();
+        logBox.textContent += `\n[${now}] ${text}`;
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // 清空日志
+    clearLogBtn.addEventListener('click', () => {
+        logBox.textContent = '【系统】日志已清空';
+    });
+
+    // 清空输入框
+    clearInputBtn.addEventListener('click', () => {
+        mainInput.value = '';
+        mainInput.focus(); // 清空后自动聚焦，方便继续输入
+    });
+
+    // 校验音频是否有效
+    function checkAudioValid(url) {
+        return new Promise((resolve) => {
+            const audio = new Audio(url);
+            audio.addEventListener('loadedmetadata', () => resolve(audio.duration > 0.1));
+            audio.addEventListener('error', () => resolve(false));
+            audio.src = url;
+        });
+    }
+
+    // 播放音频
+    window.playAudio = async function (word, type) {
+        const encodeWord = encodeURIComponent(word);
+        const url = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=${type}`;
+        const isValid = await checkAudioValid(url);
+        if (!isValid) {
+            addLog(`❌ 【${word}】${type === 1 ? '英式' : '美式'}发音不存在`);
+            return;
+        }
+        const audio = new Audio(url);
+        audio.play();
+        addLog(`▶️ 播放【${word}】${type === 1 ? '英式' : '美式'}发音`);
+    }
+
+    // 批量校验单词，生成卡片
+    async function renderWordCards(words) {
+        wordList = words;
+        cardContainer.innerHTML = '';
+        addLog(`⏳ 正在校验单词发音有效性，请稍候...`);
+        for (let idx = 0; idx < words.length; idx++) {
+            const word = words[idx];
+            const encodeWord = encodeURIComponent(word);
+            const urlUk = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=1`;
+            const urlUs = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=2`;
+            
+            const [hasUk, hasUs] = await Promise.all([
+                checkAudioValid(urlUk),
+                checkAudioValid(urlUs)
+            ]);
+
+            const card = document.createElement('div');
+            card.className = 'word-card';
+            card.innerHTML = `<div class="word-title">单词：${word}</div>`;
+
+            if (!hasUk && !hasUs) {
+                card.innerHTML += `<div class="error-text">单词可能输入错误，请检查！</div>`;
+                addLog(`⚠️ 单词【${word}】无英美发音，判定为错误单词`);
+            } else {
+                card.innerHTML += `
+                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div class="audio-row" style="flex: 1; margin: 0;">
+                        <input type="radio" name="radio_${idx}" value="uk" id="uk_${idx}" ${hasUk ? '' : 'disabled'}>
+                        <label for="uk_${idx}">英式</label>
+                        <button class="play-btn" data-word="${word}" data-type="1" ${hasUk ? '' : 'disabled'}>试听</button>
+                    </div>
+                    <div class="audio-row" style="flex: 1; margin: 0;">
+                        <input type="radio" name="radio_${idx}" value="us" id="us_${idx}" ${hasUs ? '' : 'disabled'}>
+                        <label for="us_${idx}">美式</label>
+                        <button class="play-btn" data-word="${word}" data-type="2" ${hasUs ? '' : 'disabled'}>试听</button>
+                    </div>
+                 </div>
+                `;
+            }
+            cardContainer.appendChild(card);
+        }
+        cardContainer.style.display = 'block';
+        downloadSelectBtn.style.display = 'block';
+        addLog(`✅ 全部校验完成，已生成${words.length}个单词卡片`);
+    }
+
+    // --- 核心修改：文件系统操作 (保持公共目录逻辑) ---
+    function initFileSystem() {
+        return new Promise((resolve, reject) => {
+            if (window.plus && window.plus.io) {
+                window.plus.io.requestFileSystem(window.plus.io.EXTERNAL_STORAGE, function(fs) {
+                    const downloadPath = "_downloads/"; 
+                    window.plus.io.resolveLocalFileSystemURL(downloadPath, function(dirEntry) {
+                        dirEntry.getDirectory(FOLDER_NAME, { create: true }, function(targetDir) {
+                            targetDirEntry = targetDir;
+                            addLog(`✅ 已定位/创建公共目录: Download/${FOLDER_NAME}`);
+                            resolve();
+                        }, function(e) {
+                            addLog(`❌ 创建子文件夹失败: ${e.message}`);
+                            reject(e);
+                        });
+                    }, function(e) {
+                         const rootPath = fs.root.fullPath; 
+                         const targetPath = rootPath + "/Download/" + FOLDER_NAME;
+                         window.plus.io.resolveLocalFileSystemURL(targetPath, function(entry) {
+                             targetDirEntry = entry;
+                             addLog(`✅ 定位到目录: ${targetPath}`);
+                             resolve();
+                         }, function() {
+                             window.plus.io.resolveLocalFileSystemURL(rootPath + "/Download", function(dlDir) {
+                                 dlDir.getDirectory(FOLDER_NAME, {create: true}, function(newDir) {
+                                     targetDirEntry = newDir;
+                                     addLog(`✅ 创建并定位到目录: ${targetPath}`);
+                                     resolve();
+                                 }, reject);
+                             }, reject);
+                         });
+                    });
+                }, function(e) {
+                    addLog(`❌ 请求文件系统失败: ${e.message} (请检查是否授予存储权限)`);
+                    reject(e);
+                });
+            } else {
+                addLog(`⚠️ 当前环境不支持原生文件系统，将使用浏览器默认下载。`);
+                targetDirEntry = null;
+                resolve();
+            }
+        });
+    }
+
+    function checkFileExists(filename) {
+        return new Promise((resolve) => {
+            if (!targetDirEntry) return resolve(false);
+            targetDirEntry.getFile(filename, { create: false }, function(fileEntry) {
+                resolve(true); 
+            }, function(e) {
+                resolve(false); 
+            });
+        });
+    }
+
+    function saveAudioToDir(blob, filename) {
+        if (!targetDirEntry) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            return;
+        }
+
+        targetDirEntry.getFile(filename, { create: true }, function(fileEntry) {
+            fileEntry.createWriter(function(writer) {
+                writer.onwriteend = function(e) { addLog(`✅ 成功保存: ${filename}`); };
+                writer.onerror = function(e) { addLog(`❌ 写入失败: ${filename} - ${e.toString()}`); };
+                writer.write(blob);
+            }, function(e) { addLog(`❌ 创建写入器失败: ${e.toString()}`); });
+        }, function(e) { addLog(`❌ 获取文件失败: ${e.toString()}`); });
+    }
+
+    async function downloadAudio(url, filename) {
+        try {
+            const exists = await checkFileExists(filename);
+            if (exists) {
+                addLog(`⏭️ 文件已存在，跳过下载: ${filename}`);
+                return true; 
+            }
+            const valid = await checkAudioValid(url);
+            if (!valid) {
+                addLog(`❌ 【${filename}】无有效发音资源，跳过`);
+                return false;
+            }
+            const res = await fetch(url, { mode: 'cors' });
+            if (!res.ok) throw new Error(`HTTP状态码: ${res.status}`);
+            const blob = await res.blob();
+            saveAudioToDir(blob, filename);
+            return true;
+        } catch (err) {
+            addLog(`❌ 失败 [${filename}] 错误信息: ${err.message}`);
+            return false;
+        }
+    }
+
+    // --- 解析单词按钮逻辑 (包含文本提取) ---
+    parseBtn.addEventListener('click', async function () {
+        let words = [];
+        const isTextMode = tabText.classList.contains('active');
+        const text = mainInput.value.trim();
+
+        if (!text) {
+            addLog(`⚠️ 错误：未输入任何内容`);
+            return;
+        }
+
+        if (isTextMode) {
+            // 文本取词模式
+            const matches = text.match(/[a-zA-Z]+/g) || [];
+            const uniqueWords = [...new Set(matches.map(w => w.toLowerCase()))];
+            words = uniqueWords;
+            addLog(`📝 文本取词模式：从文本中提取到 ${matches.length} 个单词，去重后剩余 ${words.length} 个`);
+        } else {
+            // 普通查词模式
+            words = text.split('\n').map(w => w.trim()).filter(w => w !== '');
+            addLog(`🚀 查词模式：解析完成，有效单词数量：${words.length}`);
+        }
+
+        if (words.length === 0) {
+            addLog(`⚠️ 错误：未检测到有效单词`);
+            return;
+        }
+
+        parseBtn.disabled = true;
+        await renderWordCards(words);
+        parseBtn.disabled = false;
+    });
+
+    // 批量下载勾选的发音
+    downloadSelectBtn.addEventListener('click', async function () {
+        downloadSelectBtn.disabled = true;
+        parseBtn.disabled = true;
+        addLog(`——————————————————`);
+        
+        await initFileSystem();
+
+        let downloadTotal = 0;
+        let skipCount = 0;
+        
+        for (let i = 0; i < wordList.length; i++) {
+            const word = wordList[i];
+            const lowerWord = word.toLowerCase();
+            const checkRadio = document.querySelector(`input[name="radio_${i}"]:checked`);
+            
+            if (!checkRadio) {
+                addLog(`⏭️ 单词【${word}】未选择发音，跳过`);
+                skipCount++;
+                continue;
+            }
+            
+            const selectType = checkRadio.value;
+            addLog(`⏳ 处理(${i + 1}/${wordList.length})：${word} (${selectType === 'uk' ? '英' : '美'})`);
+            
+            const encodeWord = encodeURIComponent(word);
+            const fileName = `${lowerWord}.mp3`;
+            const audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeWord}&type=${selectType === 'uk' ? 1 : 2}`;
+            
+            const success = await downloadAudio(audioUrl, fileName);
+            if (success) downloadTotal++;
+        }
+        
+        addLog(`🎉 任务结束！成功处理${downloadTotal}个，跳过${skipCount}个`);
+        downloadSelectBtn.disabled = false;
+        parseBtn.disabled = false;
+    });
+
+    // 使用事件委托来处理播放按钮的点击
+    cardContainer.addEventListener('click', async function (event) {
+        if (event.target && event.target.classList.contains('play-btn')) {
+            const button = event.target;
+            const word = button.getAttribute('data-word');
+            const type = parseInt(button.getAttribute('data-type'));
+            await playAudio(word, type);
+        }
+    });
+</script>
+</body>
+</html>
