@@ -43,11 +43,25 @@
     textarea {
         width: 100%; padding: 10px; margin-bottom: 10px; resize: vertical;
         border: 1px solid #ccc; border-radius: 4px; font-size: 14px; height: 130px;
+        /* 修复：强制文本选择 */
+        -webkit-user-select: text;
+        user-select: text;
+        /* 修复：防止 WebView 触摸拦截 */
+        -webkit-touch-callout: default;
+        touch-action: auto;
+    }
+    /* 修复：当 textarea 获得焦点时的样式 */
+    textarea:focus {
+        border-color: #00b488;
+        outline: none;
+        box-shadow: 0 0 5px rgba(0, 180, 136, 0.3);
     }
     button {
         width: 100%; padding: 12px; background-color: #00b488; color: white;
         border: none; border-radius: 4px; cursor: pointer; font-size: 16px;
         transition: background-color 0.3s; margin-bottom: 8px;
+        /* 修复：防止点击时触发焦点转移 */
+        touch-action: manipulation;
     }
     button:hover:not(:disabled) { background-color: #009973; }
     button:disabled { background-color: #cccccc; cursor: not-allowed; }
@@ -62,7 +76,7 @@
     .mini-btn:hover:not(:disabled) { background: #666; }
 
     #logBox {
-        margin-top: 12px; margin-bottom: 8px; /* 给下方的清空日志按钮留出一点间距 */
+        margin-top: 12px; margin-bottom: 8px;
         border: 1px solid #ddd; border-radius: 4px; padding: 10px;
         height: 180px; overflow-y: auto; font-size: 12px; white-space: pre-wrap;
         line-height: 1.5; color: #333; background: #fafafa;
@@ -99,7 +113,6 @@
     <!-- 唯一输入框 -->
     <textarea id="mainInput" placeholder="粘贴中英文混合的文章或段落&#10;系统会自动提取所有英文单词并去重&#10;例如：&#10;今天天气很好，我们去 park 散步吧。这里的 scenery 非常 beautiful。"></textarea>
 
-
     <button id="parseBtn">生成试听卡片</button>
     
     <button class="mini-btn" id="clearInputBtn">清空输入</button>
@@ -128,21 +141,96 @@
     const cardContainer = document.getElementById('cardContainer');
     const downloadSelectBtn = document.getElementById('downloadSelectBtn');
 
+    // ============ 焦点修复核心代码 ============
+    
+    // 1. 强制唤醒输入框的函数
+    function wakeUpInput() {
+        // 先移除所有焦点
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+        // 延迟后重新聚焦到 textarea
+        setTimeout(() => {
+            mainInput.focus();
+            // 对于某些 Android WebView，需要额外触发点击事件
+            mainInput.click();
+            // 尝试选中文本（如果有内容的话）
+            if (mainInput.value.length > 0) {
+                mainInput.setSelectionRange(0, 0);
+            }
+        }, 50);
+    }
+
+    // 2. 页面加载完成后聚焦
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(wakeUpInput, 300);
+    });
+
+    // 3. 监听页面可见性变化（从后台返回时触发）
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            // 页面变为可见时，重新聚焦
+            setTimeout(wakeUpInput, 100);
+            // 额外保险：滚动到输入框位置
+            mainInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+
+    // 4. 监听 WebView 的焦点事件（针对 Android）
+    window.addEventListener('focus', function() {
+        setTimeout(wakeUpInput, 100);
+    });
+
+    // 5. 点击任何按钮前，先记录焦点状态并尝试保持
+    document.addEventListener('click', function(event) {
+        const target = event.target;
+        // 如果点击的是按钮，在点击后重新聚焦输入框
+        if (target.tagName === 'BUTTON' || target.closest('button')) {
+            // 延迟重新聚焦，让按钮的点击事件先执行
+            setTimeout(wakeUpInput, 150);
+        }
+    }, true); // 使用捕获阶段
+
+    // 6. 针对输入框本身的额外保护
+    mainInput.addEventListener('blur', function() {
+        // 如果 blur 是因为页面切到后台，不做处理
+        // 如果是在页面内失去焦点，延迟检查是否应该重新聚焦
+        setTimeout(function() {
+            // 如果当前没有活跃焦点，且页面可见，重新聚焦到输入框
+            if (!document.activeElement || document.activeElement === document.body) {
+                if (!document.hidden) {
+                    wakeUpInput();
+                }
+            }
+        }, 200);
+    });
+
+    // 7. 触摸事件优化
+    mainInput.addEventListener('touchstart', function() {
+        // 确保触摸时能正确获得焦点
+        this.focus();
+    }, { passive: true });
+
+    // ============ 原有业务代码 ============
+
     // 全局状态
     let wordList = [];
     let targetDirEntry = null;
     const FOLDER_NAME = "EnglishAudio"; 
 
-    // --- Tab 切换逻辑 (不再切换DOM，只切换属性) ---
+    // --- Tab 切换逻辑 ---
     tabWord.addEventListener('click', () => {
         tabWord.classList.add('active');
         tabText.classList.remove('active');
         mainInput.placeholder = "输入要查询的单词，每行一个\n例如：\nred\ngreen\nblue";
+        // 切换后唤醒输入框
+        setTimeout(wakeUpInput, 100);
     });
     tabText.addEventListener('click', () => {
         tabText.classList.add('active');
         tabWord.classList.remove('active');
         mainInput.placeholder = "粘贴中英文混合的文章或段落\n系统会自动提取所有英文单词并去重\n例如：\n今天天气很好，我们去 park 散步吧。这里的 scenery 非常 beautiful。";
+        setTimeout(wakeUpInput, 100);
     });
 
     // 日志追加函数
@@ -160,7 +248,8 @@
     // 清空输入框
     clearInputBtn.addEventListener('click', () => {
         mainInput.value = '';
-        mainInput.focus(); // 清空后自动聚焦，方便继续输入
+        // 清空后立即唤醒
+        wakeUpInput();
     });
 
     // 校验音频是否有效
@@ -231,9 +320,12 @@
         cardContainer.style.display = 'block';
         downloadSelectBtn.style.display = 'block';
         addLog(`✅ 全部校验完成，已生成${words.length}个单词卡片`);
+        
+        // 生成卡片后，唤醒输入框
+        setTimeout(wakeUpInput, 200);
     }
 
-    // --- 核心修改：文件系统操作 (保持公共目录逻辑) ---
+    // --- 文件系统操作 ---
     function initFileSystem() {
         return new Promise((resolve, reject) => {
             if (window.plus && window.plus.io) {
@@ -332,7 +424,7 @@
         }
     }
 
-    // --- 解析单词按钮逻辑 (包含文本提取) ---
+    // --- 解析单词按钮逻辑 ---
     parseBtn.addEventListener('click', async function () {
         let words = [];
         const isTextMode = tabText.classList.contains('active');
@@ -340,29 +432,32 @@
 
         if (!text) {
             addLog(`⚠️ 错误：未输入任何内容`);
+            // 即使报错也唤醒输入框
+            wakeUpInput();
             return;
         }
 
         if (isTextMode) {
-            // 文本取词模式
             const matches = text.match(/[a-zA-Z]+/g) || [];
             const uniqueWords = [...new Set(matches.map(w => w.toLowerCase()))];
             words = uniqueWords;
             addLog(`📝 文本取词模式：从文本中提取到 ${matches.length} 个单词，去重后剩余 ${words.length} 个`);
         } else {
-            // 普通查词模式
             words = text.split('\n').map(w => w.trim()).filter(w => w !== '');
             addLog(`🚀 查词模式：解析完成，有效单词数量：${words.length}`);
         }
 
         if (words.length === 0) {
             addLog(`⚠️ 错误：未检测到有效单词`);
+            wakeUpInput();
             return;
         }
 
         parseBtn.disabled = true;
         await renderWordCards(words);
         parseBtn.disabled = false;
+        // 完成后唤醒
+        setTimeout(wakeUpInput, 100);
     });
 
     // 批量下载勾选的发音
@@ -401,6 +496,8 @@
         addLog(`🎉 任务结束！成功处理${downloadTotal}个，跳过${skipCount}个`);
         downloadSelectBtn.disabled = false;
         parseBtn.disabled = false;
+        // 完成后唤醒
+        setTimeout(wakeUpInput, 100);
     });
 
     // 使用事件委托来处理播放按钮的点击
@@ -412,6 +509,9 @@
             await playAudio(word, type);
         }
     });
+
+    // 额外：页面卸载前不需要额外操作
+    console.log('✅ 焦点修复已启用');
 </script>
 </body>
 </html>
