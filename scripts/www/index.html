@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>培训班出勤管理</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#ffffff; --ink:#1f2328; --muted:#6b7280;
+    --line:#d8dce1; --primary:#2c5f8a; --primary-soft:#e8eef4;
+    --ok:#2e7d32; --ok-bg:#e7f3ea; --bad:#c0392b; --bad-bg:#fdecea; --extra:#e0a000;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;}
+  /* 滚动条统一处理：所有页面都不显示滚动条、也不占布局宽度，
+     避免内容变高（如切双月）时滚动条出现导致可用宽度突变、整页横向抖动 */
+  html{scrollbar-gutter:stable;scrollbar-width:none;}
+  ::-webkit-scrollbar{width:0;height:0;}
+  @supports not (scrollbar-gutter:stable){html{overflow-y:scroll;}}
+  body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;}
+header{background:var(--primary);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;}
+header h1{font-size:16px;font-weight:600;letter-spacing:.5px;flex:1;}
+.menu-btn{margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;width:38px;height:38px;border-radius:6px;cursor:pointer;}
+.menu-btn:active{background:rgba(255,255,255,.3);}
+nav.tabs{display:flex;background:var(--panel);border-bottom:1px solid var(--line);}
+nav.tabs button{flex:1;min-width:0;padding:12px 4px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13.5px;border-bottom:2px solid transparent;white-space:nowrap;}
+nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600;}
+  main{padding:12px;max-width:760px;margin:0 auto;}
+  .view{display:none;} .view.active{display:block;}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .toolbar .spacer{flex:1;}
+  button.btn{background:var(--panel);border:1px solid var(--line);padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--ink);font-size:13.5px;min-height:38px;}
+  button.btn:hover{background:var(--primary-soft);}
+  button.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  button.btn.primary:hover{filter:brightness(1.05);}
+  button.btn.danger{color:var(--bad);border-color:#eccfcb;}
+  button.btn.danger:hover{background:var(--bad-bg);}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;}
+  .toggle button{border:none;background:var(--panel);padding:6px 12px;cursor:pointer;font-size:13px;color:var(--muted);}
+  .toggle button.on{background:var(--primary);color:#fff;}
+  .month-title{font-size:15px;font-weight:600;min-width:120px;text-align:center;}
+  .calbar{display:flex;align-items:center;gap:8px;flex:1 1 240px;min-width:0;flex-wrap:nowrap;}
+  .calbar .month-title{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .calbar .btn{min-width:40px;padding:8px 12px;}
+  .calbar .toggle{flex:0 0 auto;}
+  .toolbar>select{flex:0 1 auto;min-width:110px;max-width:100%;}
+  .cal-wrap{display:flex;gap:16px;flex-wrap:wrap;}
+  .cal{flex:1;min-width:280px;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .cal-head{display:grid;grid-template-columns:repeat(7,1fr);background:var(--primary-soft);}
+  .cal-head div{text-align:center;padding:7px 0;font-size:13px;color:var(--primary);font-weight:600;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+  .cell{min-height:56px;border:1px solid var(--line);border-top:none;border-left:none;padding:4px 5px;cursor:default;position:relative;}
+  .cell:nth-child(7n+1){border-left:1px solid var(--line);}
+  .cell.out{background:#fafafa;color:#bcc2c9;}
+  .cell.today{box-shadow:inset 0 0 0 2px var(--primary);}
+  .cell.has-course{cursor:pointer;}
+  .cell.has-course:hover{background:var(--primary-soft);}
+  .cell .dnum{font-size:13px;font-weight:600;}
+  .cell .course{margin-top:3px;font-size:11px;background:var(--primary-soft);color:var(--primary);border-radius:3px;padding:1px 4px;display:block;margin-bottom:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+  .cell .course.future{cursor:default;opacity:.6;}
+  .cell .course.extra{background:#fdeccf;color:#8a5a00;}
+  .cell .ind{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--primary);}
+  .cell .ind-extra{background:var(--extra);}
+  .cell.future .ind{opacity:.4;}
+  .cell .course:hover{filter:brightness(.96);}
+  .legend{margin-top:10px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .dot{width:10px;height:10px;border-radius:2px;display:inline-block;}
+  .overlay{position:fixed;inset:0;background:rgba(20,24,28,.4);display:none;z-index:30;}
+  .overlay.show{display:block;}
+  .panel{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;background:var(--panel);box-shadow:-4px 0 16px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .2s;z-index:40;display:flex;flex-direction:column;}
+  .panel.show{transform:translateX(0);}
+  .panel-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .panel-head h3{font-size:15px;}
+  .panel-head .sub{font-size:12px;color:var(--muted);margin-top:3px;}
+  .panel-body{flex:1;overflow:auto;padding:12px 16px;}
+  .panel-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;}
+  .close{cursor:pointer;color:var(--muted);font-size:20px;line-height:1;border:none;background:none;flex-shrink:0;}
+  .dirty{display:none;align-self:flex-start;font-size:12px;color:var(--bad);border:1px solid #eccfcb;padding:1px 6px;border-radius:3px;flex-shrink:0;}
+  .stu-row{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);}
+  .stu-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);}
+  .stu-row .name{flex:1;font-size:14px;}
+  .stu-row .state{font-size:12px;}
+  .bar{display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;}
+  .shift-row{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border:1px solid var(--line);border-radius:3px;margin-bottom:8px;cursor:pointer;background:#fff;}
+  .shift-row:hover{background:var(--primary-soft);}
+  .shift-row .nm{font-weight:600;}
+  .shift-row .meta{font-size:12px;color:var(--muted);}
+  .shift-row.back{justify-content:center;color:var(--primary);font-weight:600;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px;margin-bottom:14px;}
+  .card h3{font-size:14px;margin-bottom:10px;}
+  .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .field input,.field select{padding:7px 9px;border:1px solid var(--line);border-radius:3px;font-size:13px;background:#fff;color:var(--ink);}
+  .field input[type=text]{min-width:170px;}
+  .field input[type=date]{padding:6px 8px;border:1px solid var(--line);border-radius:3px;font-size:13px;}
+  .checks{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;}
+  .chk{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:3px;padding:4px 9px;font-size:13px;cursor:pointer;background:#fff;}
+  .chk input{accent-color:var(--primary);}
+  .list-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:11px 6px;border-bottom:1px solid var(--line);}
+  .list-row .meta{font-size:12px;color:var(--muted);}
+  .list-row .row-main{flex:1;min-width:0;}
+  .list-row .row-name{font-size:15px;font-weight:600;line-height:1.3;word-break:break-word;}
+  .list-row .row-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;word-break:break-word;}
+  .list-row .acts{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end;margin-left:auto;}
+  .list-row .acts-row{display:flex;gap:6px;justify-content:flex-end;}
+  .list-row .acts-row .btn{flex:0 1 auto;min-width:56px;padding:8px 10px;text-align:center;}
+  .list-row .edit-fields{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0;}
+  .list-row .edit-fields select,.list-row .edit-fields input[type=text]{flex:1 1 100px;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:3px;font-size:13px;background:#fff;color:var(--ink);}
+  .list-row .edit-fields input[type=text]{flex:2 1 150px;min-width:120px;}
+  .list-row .edit-acts{flex:1 1 100%;justify-content:flex-start;}
+  .list-row .edit-acts .btn{min-width:76px;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 16px;margin-bottom:12px;font-size:13px;}
+  .stat b{color:var(--primary);font-size:18px;}
+  .attended{background:var(--ok-bg)!important;color:var(--ok)!important;}
+  .attended .dnum{color:var(--ok);}
+  .qshift{display:block;font-size:10px;line-height:1.25;background:#fff;color:var(--ok);border:1px solid #bfe3c6;border-radius:3px;padding:1px 3px;margin-top:2px;max-width:100%;white-space:normal;word-break:break-all;overflow-wrap:anywhere;}
+  .note{background:#fff8e6;border:1px solid #f0d98a;color:#7a5b00;border-radius:4px;padding:10px 12px;font-size:12px;margin-bottom:14px;line-height:1.6;}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  .tbl th,.tbl td{border:1px solid var(--line);padding:6px 8px;text-align:left;}
+  .tbl th{background:var(--primary-soft);color:var(--primary);font-weight:600;}
+  .rate-low{color:var(--bad);font-weight:600;}
+  .help{font-size:13px;line-height:1.8;}
+  .help h4{font-size:14px;margin:14px 0 6px;color:var(--primary);}
+  .help ol,.help ul{margin-left:20px;}
+  .help code{background:#eef1f4;padding:1px 5px;border-radius:3px;font-size:12px;}
+  .help .warn{color:var(--bad);}
+  code{background:#eef1f4;padding:1px 5px;border-radius:3px;font-size:12px;}
+  /* 抽屉菜单（班次总览/数据备份/使用说明） */
+  .drawer{position:fixed;top:0;right:0;height:100%;width:240px;max-width:80vw;background:var(--panel);box-shadow:-4px 0 16px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .2s;z-index:45;display:flex;flex-direction:column;}
+  .drawer.show{transform:translateX(0);}
+  .drawer-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-weight:600;color:var(--primary);}
+  .drawer-item{display:block;width:100%;text-align:left;padding:15px 16px;border:none;background:none;cursor:pointer;font-size:15px;color:var(--ink);border-bottom:1px solid var(--line);}
+  .drawer-item:active{background:var(--primary-soft);}
+</style>
+</head>
+<body>
+<header>
+  <h1>培训班出勤</h1>
+  <button class="menu-btn" id="menuBtn" aria-label="菜单">☰</button>
+</header>
+<nav class="tabs" id="mainTabs">
+  <button class="active" data-view="cal">课程日历</button>
+  <button data-view="shift">班次管理</button>
+  <button data-view="stu">学员管理</button>
+  <button data-view="query">个人查询</button>
+</nav>
+<div class="overlay" id="menuOverlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">菜单<button class="close" id="menuClose">×</button></div>
+  <button class="drawer-item" data-view="roster">班次总览</button>
+  <button class="drawer-item" data-view="data">数据备份</button>
+  <button class="drawer-item" data-view="help">使用说明</button>
+</aside>
+<main>
+  <!-- 课程日历 -->
+  <section class="view active" id="view-cal">
+    <div class="toolbar">
+      <div class="calbar">
+        <button class="btn" id="prevM">‹</button>
+        <span class="month-title" id="mTitle">—</span>
+        <button class="btn" id="nextM">›</button>
+        <div class="toggle">
+          <button id="oneM" class="on">单月</button>
+          <button id="twoM">双月</button>
+        </div>
+      </div>
+    </div>
+    <div class="note">带<b>圆点</b>的日期表示有班次，点该日期即可查看当天具体班次并登记（单班直接登记，多班先选班）。<b>橙色圆点</b>为加课/补课（例外日期）。右上角「单月/双月」可切换，双月用于跨月排课对照。仅可登记<b>今天及以前</b>的日期，未来日期只显示不可登记。</div>
+    <div class="cal-wrap" id="calWrap"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--primary)"></i> 有班次（点日期看具体班次）</span>
+      <span><i class="dot" style="background:var(--extra)"></i> 加课/补课（例外日期）</span>
+      <span><i class="dot" style="background:var(--ok)"></i> 个人查询中：已出勤日期</span>
+    </div>
+  </section>
+
+  <!-- 班次管理 -->
+  <section class="view" id="view-shift">
+    <div class="card">
+      <h3>添加班次（排课模板）</h3>
+      <div class="field">
+        <select id="csWeek"></select>
+        <select id="csPeriod">
+          <option value="上午">上午</option>
+          <option value="下午">下午</option>
+          <option value="晚上">晚上</option>
+          <option value="全天">全天</option>
+        </select>
+        <input type="text" id="csName" placeholder="班次名称（自动生成可改）">
+        <button class="btn primary" id="addCourse">添加班次</button>
+      </div>
+      <div class="hint">班次 = 星期 + 时段 + 名称。日历按星期自动把班次铺到对应日期。改排期用「编辑」，停开用「停用」——历史出勤保留。点「例外」可设置某天<b>停课</b>或<b>加课（补课）</b>。</div>
+    </div>
+    <div class="card">
+      <h3>当前班次</h3>
+      <div id="courseList"></div>
+    </div>
+  </section>
+
+  <!-- 学员管理 -->
+  <section class="view" id="view-stu">
+    <div class="card">
+      <h3>添加学员并分配班次（可多选）</h3>
+      <div class="field">
+        <input type="text" id="stuName" placeholder="输入学员姓名">
+      </div>
+      <div class="checks" id="stuCourses"></div>
+      <button class="btn primary" id="addStu">添加学员</button>
+      <div class="hint">一人可上多个班次：勾选所属全部班次。已退出的学员不会出现在点名名单，但历史出勤仍可查。</div>
+    </div>
+    <div class="card">
+      <h3>当前学员名单</h3>
+      <div id="stuList"></div>
+    </div>
+  </section>
+
+  <!-- 个人查询 -->
+  <section class="view" id="view-query">
+    <div class="toolbar">
+      <span>选择学员：</span>
+      <select id="qStu" style="padding:7px 9px;border:1px solid var(--line);border-radius:3px;"></select>
+      <div class="calbar">
+        <button class="btn" id="qPrev">‹</button>
+        <span class="month-title" id="qTitle">—</span>
+        <button class="btn" id="qNext">›</button>
+        <div class="toggle">
+          <button id="qOne" class="on">单月</button>
+          <button id="qTwo">双月</button>
+        </div>
+      </div>
+    </div>
+    <div class="stat" id="qStat">请选择学员查看出勤统计。</div>
+    <div class="cal-wrap" id="qCal"></div>
+  </section>
+
+  <!-- 班次总览 -->
+  <section class="view" id="view-roster">
+    <div class="toolbar">
+      <span>选择班次：</span>
+      <select id="rCourse" style="padding:7px 9px;border:1px solid var(--line);border-radius:3px;"></select>
+      <button class="btn" id="rPrev">‹</button>
+      <span class="month-title" id="rTitle" style="min-width:90px;">—</span>
+      <button class="btn" id="rNext">›</button>
+    </div>
+    <div class="hint">按班次查看学员出勤：应到 = 该月实际有课的日期（仅统计到今天），实到 = 已登记到的次数，出勤率低者标红。点击表头可切换月份。</div>
+    <div id="rBody"></div>
+  </section>
+
+  <!-- 数据备份 -->
+  <section class="view" id="view-data">
+    <div class="note">
+      数据默认存在本机浏览器（App 私有目录）。用 <b>PakePlus</b> 打包成 App 后，<b>卸载重装会清空</b>。
+      因此请定期用「导出备份」把 JSON 存到手机下载目录或网盘；换机/重装后用「导入备份」恢复。
+    </div>
+    <div class="card">
+      <h3>备份与恢复</h3>
+      <div class="field">
+        <button class="btn primary" id="exportBtn">导出备份(JSON)</button>
+        <button class="btn" id="importBtn">导入备份</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </div>
+      <div class="hint">导出文件可保存到手机下载目录或网盘；换手机/重装后通过「导入备份」恢复全部学员、班次、例外与出勤记录。</div>
+      <label class="chk" style="margin-top:10px;"><input type="checkbox" id="autoBackup"> 自动备份到下载目录（每次保存时导出一份带时间戳的备份文件）</label>
+      <div class="hint">开启后，每次保存都会在下载目录生成备份（如 attendance-auto-...json）。若打包后的 App 不支持下载，此选项无效，请仍用手动「导出备份」。</div>
+    </div>
+    <div class="card">
+      <h3>当前数据量</h3>
+      <div id="dataStat" class="meta"></div>
+    </div>
+    <div class="card">
+      <h3 class="warn" style="color:var(--bad)">危险操作</h3>
+      <button class="btn danger" id="clearBtn">清空全部数据</button>
+      <div class="hint">将删除所有学员、班次、例外与出勤记录，且不可恢复（导入备份可还原）。</div>
+    </div>
+  </section>
+
+  <!-- 使用说明 -->
+  <section class="view" id="view-help">
+    <div class="card help">
+      <h4>一、日常用法</h4>
+      <ol>
+        <li><b>排课</b>：到「班次管理」按 星期+时段 添加班次（如 周日上午1班）。日历自动铺到对应星期；调整排期用「编辑」，停开用「停用」（历史出勤保留，且停用后默认从列表隐藏）。误添加的班次可用「删除」彻底移除（含其出勤）；停用的班次可在列表上方「显示已停用的班次」找回并重新启用。</li>
+        <li><b>例外日期</b>：班次行点「例外」可设置某天<b>停课</b>或<b>加课/补课</b>。停课会隐藏该日此班并清除其出勤；加课在某非固定日额外排一节课。调课 = 原日停课 + 新日加课。</li>
+        <li><b>加学员</b>：到「学员管理」输入姓名，勾选所属班次（可多选）。中途退课/转班用「编辑」改所属班次或标记为「已退出」（停用后默认从列表隐藏，可在「显示已停用的学员」找回）；误添加可用「删除」彻底移除。</li>
+        <li><b>登记出勤</b>：在「课程日历」点具体班次标签 → 勾选到勤 → 保存。可用「全选到勤 / 全体缺勤」。改动后未保存会提示。</li>
+        <li><b>查个人出勤</b>：到「个人查询」选学员（切换学员即刷新），日历高亮出勤日期并分行列出当天各班次；可用「单月/双月」切换，双月用于跨收费周期对照；底部显示应到/实到/出勤率。</li>
+        <li><b>班次总览</b>：到「班次总览」选班次，按月查看每位学员的应到、实到与出勤率。</li>
+      </ol>
+      <h4>二、数据保全（重要）</h4>
+      <ul>
+        <li>所有数据存在本机。请定期「导出备份」到下载目录/网盘。</li>
+        <li>系统自动只保留最近 <b>12 个月</b>的出勤与例外数据，更早的会在打开应用时清理（以控制体积）；如需长期留存请导出备份。</li>
+        <li>换手机或重装 App 后，用「导入备份」恢复。</li>
+      </ul>
+      <h4>三、打包成安卓 App（PakePlus）</h4>
+      <ol>
+        <li>打开 PakePlus，选择「打包本地文件 / 本地 HTML」。</li>
+        <li>选中本 <code>index.html</code> 所在文件夹（即本应用根目录）。</li>
+        <li>填写应用名称、选一个图标，目标平台选 Android，开始打包，得到 APK。</li>
+        <li>手机允许「安装未知来源应用」后安装即可使用。</li>
+      </ol>
+      <p class="warn" style="margin-top:10px;">提示：本应用是纯静态网页，无需联网、无需服务器。任何支持「网页转 App」的工具都能打包，不限于 PakePlus。</p>
+    </div>
+  </section>
+</main>
+
+<!-- 滑出面板（登记 / 选班 / 例外管理 共用） -->
+<div class="overlay" id="overlay"></div>
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <div>
+      <h3 id="pTitle">出勤登记</h3>
+      <div class="sub" id="pSub"></div>
+    </div>
+    <span id="pDirty" class="dirty">● 未保存</span>
+    <button class="close" id="pClose">×</button>
+  </div>
+  <div class="panel-body" id="pBody"></div>
+  <div class="panel-foot" id="pFoot">
+    <button class="btn primary" id="pSave" style="flex:1;">保存本节课出勤</button>
+  </div>
+</div>
+
+<script>
+/* ============ 数据层 ============ */
+const SCHEMA=1;
+const WEEK=['日','一','二','三','四','五','六'];
+const STORE_KEY='attendance_app_v1';
+
+function defaultState(){
+  return {
+    schema:SCHEMA,
+    courses:[],
+    students:[],
+    attendance:{},
+    exceptions:[]
+  };
+}
+let state=defaultState();
+
+function load(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    const obj=JSON.parse(raw);
+    if(!obj||obj.schema!==SCHEMA){ console.warn('数据结构版本不符，使用默认数据'); return; }
+    state={
+      schema:SCHEMA,
+      courses:Array.isArray(obj.courses)?obj.courses:[],
+      students:Array.isArray(obj.students)?obj.students:[],
+      attendance:obj.attendance&&typeof obj.attendance==='object'?obj.attendance:{},
+      exceptions:Array.isArray(obj.exceptions)?obj.exceptions:[]
+    };
+    // 兼容旧数据：补全字段
+    state.students=state.students.map(s=>({active:true,...s,courseIds:Array.isArray(s.courseIds)?s.courseIds:[]}));
+    const removed=pruneOld();
+    if(removed>0) persist();
+  }catch(e){ console.warn('读取本地数据失败',e); }
+}
+let autoBackupOn=false;
+function persist(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){ alert('保存失败：'+e.message); }
+  if(autoBackupOn) autoBackup();
+}
+function loadPrefs(){
+  autoBackupOn = localStorage.getItem('att_auto')==='1';
+  const cb=document.getElementById('autoBackup'); if(cb) cb.checked=autoBackupOn;
+}
+function setAutoBackup(v){ autoBackupOn=v; localStorage.setItem('att_auto', v?'1':'0'); }
+function autoBackup(){
+  try{
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    const d=new Date();
+    a.download='attendance-auto-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }catch(e){ /* 该环境不支持下载则忽略 */ }
+}
+
+/* ============ 工具 ============ */
+const pad=n=>String(n).padStart(2,'0');
+const fmt=(y,m,d)=>`${y}-${pad(m+1)}-${pad(d)}`;
+const courseName=id=>{const c=state.courses.find(x=>x.id===id);return c?c.name:id;};
+const stuName=id=>{const s=state.students.find(x=>x.id===id);return s?s.name:id;};
+const uid=p=>p+Date.now()+Math.floor(Math.random()*1000);
+const todayStr=()=>{const d=new Date();return fmt(d.getFullYear(),d.getMonth(),d.getDate());};
+
+/* 数据保留：最多保留最近 12 个月，更早的自动清理 */
+function retentionCutoff(){
+  const d=new Date(); d.setMonth(d.getMonth()-12);
+  return fmt(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function pruneOld(){
+  const cut=retentionCutoff(); let n=0;
+  for(const k of Object.keys(state.attendance)){
+    const d=k.split('__')[0];
+    if(d<cut){ delete state.attendance[k]; n++; }
+  }
+  const before=state.exceptions.length;
+  state.exceptions=state.exceptions.filter(e=>e.date>=cut);
+  n+=before-state.exceptions.length;
+  return n;
+}
+
+/* 某日期实际有哪些课（含正常按星期 + 例外） */
+function sessionsForDate(dateStr){
+  // 按本地时间解析：new Date('YYYY-MM-DD') 会按 UTC 解析，再取本地 getDay() 会整差一天星期
+  const [yy,mm,dd]=dateStr.split('-').map(Number);
+  const wd=new Date(yy,mm-1,dd).getDay();
+  const out=[];
+  state.courses.forEach(c=>{
+    if(c.active===false) return;
+    const skip=state.exceptions.some(e=>e.courseId===c.id&&e.date===dateStr&&e.type==='skip');
+    const extra=state.exceptions.find(e=>e.courseId===c.id&&e.date===dateStr&&e.type==='extra');
+    const normal=c.weekday===wd && !skip;
+    if(normal) out.push({courseId:c.id,name:c.name,period:c.period,extra:false});
+    if(extra && !normal) out.push({courseId:c.id,name:c.name,period:extra.period||c.period,extra:true});
+  });
+  return out;
+}
+
+/* ============ 日历 ============ */
+const NOW=new Date();
+let curY=NOW.getFullYear(),curM=NOW.getMonth(),mode='one';
+function monthLabel(y,m){ return `${y}年${m+1}月`; }
+function dualLabel(y1,m1,y2,m2){ return y1===y2?`${y1}年${m1+1}月 / ${m2+1}月`:`${y1}年${m1+1}月 / ${y2}年${m2+1}月`; }
+function buildMatrix(y,m){
+  const first=new Date(y,m,1), start=first.getDay();
+  const days=new Date(y,m+1,0).getDate(), prevDays=new Date(y,m,0).getDate();
+  const cells=[];
+  for(let i=start-1;i>=0;i--) cells.push({d:prevDays-i,inMonth:false});
+  for(let d=1;d<=days;d++) cells.push({d,inMonth:true});
+  while(cells.length%7!==0) cells.push({d:'',inMonth:false});
+  return cells;
+}
+function renderCalOne(y,m){
+  const cells=buildMatrix(y,m);
+  let html=`<div class="cal"><div class="cal-head">${WEEK.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
+  cells.forEach(c=>{
+    if(!c.inMonth){ html+=`<div class="cell out"><span class="dnum">${c.d}</span></div>`; return; }
+    const dateStr=fmt(y,m,c.d);
+    const wd=new Date(y,m,c.d).getDay();
+    const future=dateStr>todayStr();
+    const sessions=sessionsForDate(dateStr);
+    const isToday=(y===NOW.getFullYear()&&m===NOW.getMonth()&&c.d===NOW.getDate());
+    let cls='cell'+(isToday?' today':''), inner=`<span class="dnum">${c.d}</span>`, click='';
+    if(sessions.length){
+      cls+=' has-course';
+      const hasExtra=sessions.some(s=>s.extra);
+      inner+=`<span class="ind ${hasExtra?'ind-extra':''}" title="${sessions.map(s=>s.name).join('、')}"></span>`;
+      click=future?`onclick="futureNotice()"`:`onclick="openDay('${dateStr}')"`;
+    }
+    html+=`<div class="${cls}" ${click}>${inner}</div>`;
+  });
+  html+=`</div></div>`;
+  return {html,label:`${y}年${m+1}月`};
+}
+function renderCal(){
+  const wrap=document.getElementById('calWrap');
+  if(mode==='one'){
+    const r=renderCalOne(curY,curM);
+    wrap.innerHTML=r.html; document.getElementById('mTitle').textContent=monthLabel(curY,curM);
+  }else{
+    const r1=renderCalOne(curY,curM);
+    const ny=curM===11?curY+1:curY, nm=(curM+1)%12;
+    const r2=renderCalOne(ny,nm);
+    wrap.innerHTML=r1.html+r2.html;
+    document.getElementById('mTitle').textContent=dualLabel(curY,curM,ny,nm);
+  }
+  if(!state.courses.length) wrap.innerHTML+='<div class="hint" style="margin-top:8px;">还没有班次，请先到「班次管理」添加班次。</div>';
+}
+function futureNotice(){ alert('只能登记今天及以前的日期，未来日期不可登记。'); }
+
+/* ============ 面板：选班 -> 登记 ============ */
+let activeDate=null,activeCourse=null,activeShifts=[],dirty=false,exCid=null;
+function updateDirty(){ const el=document.getElementById('pDirty'); if(el) el.style.display=dirty?'inline':'none'; }
+function openDay(dateStr){
+  if(dateStr>todayStr()){ futureNotice(); return; }
+  activeDate=dateStr;
+  activeShifts=sessionsForDate(dateStr);
+  if(!activeShifts.length){ showEmpty(); return; }
+  if(activeShifts.length===1){ openRoll(dateStr,activeShifts[0].courseId); return; }
+  showChooser();
+}
+function showEmpty(){
+  document.getElementById('pTitle').textContent='当天无排课';
+  document.getElementById('pSub').textContent=activeDate;
+  document.getElementById('pBody').innerHTML='<div class="hint">这一天没有安排班次。可到「班次管理」添加，或用「例外」加课。</div>';
+  document.getElementById('pFoot').style.display='none'; openPanel();
+}
+function showChooser(){
+  document.getElementById('pTitle').textContent='选择班次';
+  document.getElementById('pSub').textContent=activeDate+'（周'+WEEK[new Date(activeDate).getDay()]+'）';
+  document.getElementById('pFoot').style.display='none';
+  document.getElementById('pBody').innerHTML=activeShifts.map(co=>`
+    <div class="shift-row" onclick="openRoll('${activeDate}','${co.courseId}')">
+      <span class="nm">${co.name}${co.extra?' <span class="meta">·加课</span>':''}</span><span class="meta">${co.period} · 点击登记</span>
+    </div>`).join('');
+  openPanel();
+}
+function openRoll(dateStr,courseId){
+  if(dateStr>todayStr()){ futureNotice(); return; }
+  activeDate=dateStr; activeCourse=courseId; dirty=false; updateDirty();
+  const course=state.courses.find(c=>c.id===courseId);
+  if(!course){ alert('班次不存在'); return; }
+  const ids=state.students.filter(s=>s.courseIds.includes(courseId) && s.active!==false).map(s=>s.id);
+  const rec=state.attendance[dateStr+'__'+courseId]||{};
+  document.getElementById('pTitle').textContent='出勤登记';
+  document.getElementById('pSub').textContent=course.name+' · '+dateStr+'（周'+WEEK[new Date(dateStr).getDay()]+'）';
+  document.getElementById('pFoot').style.display='flex';
+  let html='';
+  if(activeShifts.length>1) html+=`<div class="shift-row back" onclick="showChooser()">← 重选班次</div>`;
+  if(!ids.length){
+    html+='<div class="hint">该班次暂无学员，请先到「学员管理」勾选分配。</div>';
+  }else{
+    html+=`<div class="bar">
+      <button class="btn" onclick="selAll()">全选到勤</button>
+      <button class="btn" onclick="selNone()">全体缺勤</button>
+      <span class="spacer"></span><span class="meta" id="pCount"></span>
+    </div>`;
+    html+=ids.map(id=>`
+      <div class="stu-row">
+        <input type="checkbox" id="ck_${id}" ${rec[id]?'checked':''}>
+        <span class="name">${stuName(id)}</span>
+        <span class="state" id="st_${id}">${rec[id]?'已到':'未到'}</span>
+      </div>`).join('');
+  }
+  document.getElementById('pBody').innerHTML=html;
+  if(ids.length){
+    ids.forEach(id=>{
+      document.getElementById('ck_'+id).addEventListener('change',e=>{
+        document.getElementById('st_'+id).textContent=e.target.checked?'已到':'未到';
+        dirty=true; updateDirty(); updateCount();
+      });
+    });
+    updateCount();
+  }
+  openPanel();
+}
+function updateCount(){
+  const ids=state.students.filter(s=>s.courseIds.includes(activeCourse) && s.active!==false).map(s=>s.id);
+  const rec=state.attendance[activeDate+'__'+activeCourse]||{};
+  const n=ids.filter(id=>rec[id]).length;
+  const el=document.getElementById('pCount'); if(el) el.textContent=`已到勤 ${n}/${ids.length} 人`;
+}
+window.selAll=()=>{ state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).forEach(s=>{const c=document.getElementById('ck_'+s.id);if(c){c.checked=true;document.getElementById('st_'+s.id).textContent='已到';}});dirty=true;updateDirty();updateCount(); };
+window.selNone=()=>{ state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).forEach(s=>{const c=document.getElementById('ck_'+s.id);if(c){c.checked=false;document.getElementById('st_'+s.id).textContent='未到';}});dirty=true;updateDirty();updateCount(); };
+function openPanel(){ document.getElementById('overlay').classList.add('show'); document.getElementById('panel').classList.add('show'); }
+function closePanel(){ document.getElementById('overlay').classList.remove('show'); document.getElementById('panel').classList.remove('show'); activeDate=activeCourse=null; }
+function tryClosePanel(){ if(dirty && !confirm('有未保存的修改，确定放弃？')) return; dirty=false; updateDirty(); closePanel(); }
+document.getElementById('pClose').onclick=tryClosePanel;
+document.getElementById('overlay').onclick=tryClosePanel;
+document.getElementById('pSave').onclick=()=>{
+  if(!activeCourse) return;
+  const ids=state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).map(s=>s.id);
+  const rec={};
+  ids.forEach(id=>{ if(document.getElementById('ck_'+id).checked) rec[id]=true; });
+  state.attendance[activeDate+'__'+activeCourse]=rec;
+  dirty=false; updateDirty(); persist(); closePanel();
+  if(currentView==='query') renderQuery();
+  if(currentView==='roster') renderRoster();
+};
+
+/* ============ 例外日期管理 ============ */
+function openExceptionManager(cid){
+  exCid=cid; dirty=false; updateDirty();
+  const c=state.courses.find(x=>x.id===cid); if(!c) return;
+  document.getElementById('pTitle').textContent='例外日期 · '+c.name;
+  document.getElementById('pSub').textContent='停课 / 加课（补课）';
+  document.getElementById('pFoot').style.display='none';
+  renderExceptionBody();
+  openPanel();
+}
+function renderExceptionBody(){
+  const cid=exCid;
+  const list=state.exceptions.filter(e=>e.courseId===cid);
+  let html=`<div class="bar"><b>已设例外（${list.length}）</b></div>`;
+  if(!list.length) html+='<div class="hint">暂无例外。下方可添加停课或加课日期。</div>';
+  else html+=list.map(e=>`
+    <div class="list-row">
+      <div><b>${e.date}</b> <span class="meta">· ${e.type==='skip'?'停课':('加课'+(e.period?' · '+e.period:''))}</span></div>
+      <div class="acts"><button class="btn danger" onclick="delException('${e.id}')">删除</button></div>
+    </div>`).join('');
+  html+=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
+    <div class="field">
+      <input type="date" id="exDate">
+      <select id="exType"><option value="skip">停课</option><option value="extra">加课</option></select>
+      <select id="exPeriod"><option value="上午">上午</option><option value="下午">下午</option><option value="晚上">晚上</option><option value="全天">全天</option></select>
+    </div>
+    <button class="btn primary" onclick="addException()">添加例外</button>
+  </div>`;
+  document.getElementById('pBody').innerHTML=html;
+}
+window.addException=()=>{
+  const cid=exCid;
+  const date=document.getElementById('exDate').value;
+  if(!date){ alert('请选择日期'); return; }
+  const type=document.getElementById('exType').value;
+  const period=document.getElementById('exPeriod').value;
+  if(state.exceptions.some(e=>e.courseId===cid&&e.date===date&&e.type===type)){ alert('该日期已存在相同例外'); return; }
+  if(type==='skip'){
+    if(!confirm('停课会清除该日此班的出勤记录（如已登记），确定？')) return;
+    delete state.attendance[date+'__'+cid];
+  }
+  state.exceptions.push({id:uid('e'),courseId:cid,date,type,period:type==='extra'?period:undefined});
+  persist(); renderExceptionBody(); renderCal();
+};
+window.delException=id=>{
+  state.exceptions=state.exceptions.filter(e=>e.id!==id);
+  persist(); renderExceptionBody(); renderCal();
+};
+
+/* ============ 班次管理 ============ */
+function fillWeekSelect(){ document.getElementById('csWeek').innerHTML=WEEK.map((w,i)=>`<option value="${i}">周${w}</option>`).join(''); }
+function nextSeq(wd,period){ return state.courses.filter(c=>c.weekday===wd&&c.period===period).length+1; }
+function prefillCourseName(){
+  const wd=+document.getElementById('csWeek').value, period=document.getElementById('csPeriod').value;
+  document.getElementById('csName').value=`周${WEEK[wd]}${period}${nextSeq(wd,period)}班`;
+}
+let editingCourseId=null;
+function renderCourseList(){
+  const box=document.getElementById('courseList');
+  if(!state.courses.length){ box.innerHTML='<div class="hint">还没有班次。</div>'; return; }
+  const showDisabled=document.getElementById('showDisabledCourses') && document.getElementById('showDisabledCourses').checked;
+  const list=state.courses.filter(c=> c.active!==false || showDisabled);
+  let html=`<label class="chk" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="showDisabledCourses" ${showDisabled?'checked':''} onchange="renderCourseList()"> 显示已停用的班次</label>`;
+  html+=list.map(c=>{
+    if(editingCourseId===c.id){
+      const wk=WEEK.map((w,i)=>`<option value="${i}" ${i===c.weekday?'selected':''}>周${w}</option>`).join('');
+      const pe=['上午','下午','晚上','全天'].map(p=>`<option value="${p}" ${p===c.period?'selected':''}>${p}</option>`).join('');
+      return `<div class="list-row">
+        <div class="edit-fields">
+          <select id="edWeek">${wk}</select>
+          <select id="edPeriod">${pe}</select>
+          <input type="text" id="edName" value="${c.name}">
+        </div>
+        <div class="acts-row edit-acts">
+          <button class="btn primary" onclick="saveCourse('${c.id}')">保存</button>
+          <button class="btn" onclick="cancelEdit()">取消</button>
+        </div>
+      </div>`;
+    }
+    const off=c.active===false;
+    const exN=state.exceptions.filter(e=>e.courseId===c.id).length;
+    return `<div class="list-row">
+      <div class="row-main">
+        <div class="row-name" style="${off?'color:var(--muted)':''}">${c.name}</div>
+        <div class="row-meta">周${WEEK[c.weekday]} · ${c.period}${off?' · 已停用':''}${exN?' · '+exN+'个例外':''}</div>
+      </div>
+      <div class="acts">
+        <div class="acts-row">
+          <button class="btn" onclick="editCourse('${c.id}')">编辑</button>
+          <button class="btn" onclick="openExceptionManager('${c.id}')">例外</button>
+        </div>
+        <div class="acts-row">
+          ${off?`<button class="btn primary" onclick="setCourseActive('${c.id}',true)">启用</button>`:`<button class="btn danger" onclick="setCourseActive('${c.id}',false)">停用</button>`}
+          <button class="btn danger" onclick="deleteCourse('${c.id}')">删除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  box.innerHTML=html;
+}
+window.editCourse=id=>{ editingCourseId=id; renderCourseList(); };
+window.cancelEdit=()=>{ editingCourseId=null; renderCourseList(); };
+window.saveCourse=id=>{
+  const c=state.courses.find(x=>x.id===id); if(!c) return;
+  const name=document.getElementById('edName').value.trim();
+  if(!name){ alert('名称不能为空'); return; }
+  c.weekday=+document.getElementById('edWeek').value;
+  c.period=document.getElementById('edPeriod').value;
+  c.name=name;
+  editingCourseId=null; persist(); renderCourseList(); fillCourseChecks(); fillQuerySelect(); fillRosterCourseSelect(); renderCal();
+};
+window.setCourseActive=(id,on)=>{
+  const c=state.courses.find(x=>x.id===id); if(!c) return;
+  if(!on && !confirm('停用该班次？日历将不再显示此班、无法继续登记，但学员分配与全部历史出勤记录都会保留，可随时重新启用。')) return;
+  c.active=on; persist(); renderCourseList(); renderCal();
+};
+window.deleteCourse=id=>{
+  if(!confirm('彻底删除该班次？将同时删除该班的全部出勤记录与例外设置（不可恢复）。\n仅用于删除误添加的班次；若想保留历史记录请改用「停用」。')) return;
+  state.courses=state.courses.filter(c=>c.id!==id);
+  state.exceptions=state.exceptions.filter(e=>e.courseId!==id);
+  for(const k of Object.keys(state.attendance)){ const [,cid]=k.split('__'); if(cid===id) delete state.attendance[k]; }
+  state.students.forEach(s=>{ s.courseIds=s.courseIds.filter(cid=>cid!==id); });
+  persist(); renderCourseList(); fillCourseChecks(); fillQuerySelect(); fillRosterCourseSelect(); renderCal();
+};
+document.getElementById('addCourse').onclick=()=>{
+  const wd=+document.getElementById('csWeek').value, period=document.getElementById('csPeriod').value;
+  let name=document.getElementById('csName').value.trim();
+  if(!name) name=`周${WEEK[wd]}${period}${nextSeq(wd,period)}班`;
+  state.courses.push({id:uid('c'),name,weekday:wd,period,active:true});
+  persist(); renderCourseList(); fillCourseChecks(); fillQuerySelect(); fillRosterCourseSelect(); prefillCourseName();
+};
+
+/* ============ 学员管理 ============ */
+function fillCourseChecks(){
+  document.getElementById('stuCourses').innerHTML=state.courses.map(c=>`<label class="chk"><input type="checkbox" value="${c.id}">${c.name}</label>`).join('');
+}
+let editingStuId=null;
+function renderStuList(){
+  const box=document.getElementById('stuList');
+  if(!state.students.length){ box.innerHTML='<div class="hint">还没有学员。</div>'; return; }
+  const showDisabled=document.getElementById('showDisabledStu') && document.getElementById('showDisabledStu').checked;
+  const list=state.students.filter(s=> s.active!==false || showDisabled);
+  let html=`<label class="chk" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="showDisabledStu" ${showDisabled?'checked':''} onchange="renderStuList()"> 显示已停用的学员</label>`;
+  html+=list.map(s=>{
+    if(editingStuId===s.id){
+      const chk=state.courses.map(c=>`<label class="chk"><input type="checkbox" value="${c.id}" ${s.courseIds.includes(c.id)?'checked':''}>${c.name}</label>`).join('');
+      const left=s.active===false;
+      return `<div class="list-row">
+        <div class="edit-fields">
+          <input type="text" id="stName" value="${s.name}">
+          <select id="stStatus"><option value="active" ${!left?'selected':''}>在读</option><option value="left" ${left?'selected':''}>已退出</option></select>
+        </div>
+        <div class="checks" style="flex:1 1 100%">${chk}</div>
+        <div class="acts-row edit-acts">
+          <button class="btn primary" onclick="saveStu('${s.id}')">保存</button>
+          <button class="btn" onclick="cancelStuEdit()">取消</button>
+        </div>
+      </div>`;
+    }
+    const left=s.active===false;
+    return `<div class="list-row">
+      <div class="row-main">
+        <div class="row-name" style="${left?'color:var(--muted)':''}">${s.name}${left?' <span class="meta">（已退出）</span>':''}</div>
+        <div class="row-meta">${s.courseIds.map(courseName).join('、')||'未分配'}</div>
+      </div>
+      <div class="acts">
+        <div class="acts-row">
+          <button class="btn" onclick="editStu('${s.id}')">编辑</button>
+        </div>
+        <div class="acts-row">
+          ${left?`<button class="btn primary" onclick="setStuActive('${s.id}',true)">启用</button>`:`<button class="btn" onclick="setStuActive('${s.id}',false)">停用</button>`}
+          <button class="btn danger" onclick="deleteStu('${s.id}')">删除</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  box.innerHTML=html;
+}
+window.setStuActive=(id,on)=>{
+  const s=state.students.find(x=>x.id===id); if(!s) return;
+  if(!on && !confirm('停用该学员？其姓名将从点名名单移除，但全部历史出勤记录都会保留，可随时重新启用。')) return;
+  s.active=on; persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+};
+window.deleteStu=id=>{
+  if(!confirm('彻底删除该学员？将同时删除该学员的全部出勤记录（不可恢复）。\n仅用于删除误添加的学员；若想保留历史记录请改用「停用」。')) return;
+  state.students=state.students.filter(s=>s.id!==id);
+  for(const k of Object.keys(state.attendance)){ const rec=state.attendance[k]; if(rec&&rec[id]){ delete rec[id]; if(Object.keys(rec).length===0) delete state.attendance[k]; } }
+  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+};
+window.editStu=id=>{ editingStuId=id; renderStuList(); };
+window.cancelStuEdit=()=>{ editingStuId=null; renderStuList(); };
+window.saveStu=id=>{
+  const s=state.students.find(x=>x.id===id); if(!s) return;
+  const name=document.getElementById('stName').value.trim();
+  if(!name){ alert('姓名不能为空'); return; }
+  const ids=[...document.querySelectorAll('#stuList input[type=checkbox]:checked')].map(i=>i.value);
+  s.name=name; s.courseIds=ids; s.active=document.getElementById('stStatus').value!=='left';
+  editingStuId=null; persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+};
+document.getElementById('addStu').onclick=()=>{
+  const name=document.getElementById('stuName').value.trim();
+  if(!name){ alert('请输入姓名'); return; }
+  const ids=[...document.querySelectorAll('#stuCourses input:checked')].map(i=>i.value);
+  if(!ids.length){ alert('请至少勾选一个班次'); return; }
+  state.students.push({id:uid('s'),name,courseIds:ids,active:true});
+  document.getElementById('stuName').value='';
+  document.querySelectorAll('#stuCourses input').forEach(i=>i.checked=false);
+  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+};
+
+/* ============ 个人查询 ============ */
+let qY=NOW.getFullYear(),qM=NOW.getMonth();
+function fillQuerySelect(){ document.getElementById('qStu').innerHTML=state.students.map(s=>`<option value="${s.id}">${s.name}${s.active===false?'（已退出）':''}</option>`).join(''); }
+function studentAttendedMap(sid){
+  const m={};
+  for(const k in state.attendance){
+    const [d,cid]=k.split('__');
+    if(state.attendance[k][sid]){ (m[d]=m[d]||[]).push(courseName(cid)); }
+  }
+  return m;
+}
+let qMode='one';
+function renderQueryMonth(y,m,map){
+  const cells=buildMatrix(y,m);
+  let html=`<div class="cal"><div class="cal-head">${WEEK.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
+  cells.forEach(c=>{
+    if(!c.inMonth){ html+=`<div class="cell out"><span class="dnum">${c.d}</span></div>`; return; }
+    const ds=fmt(y,m,c.d), on=!!map[ds], isToday=(y===NOW.getFullYear()&&m===NOW.getMonth()&&c.d===NOW.getDate());
+    const cls='cell'+(on?' attended':'')+(isToday?' today':'');
+    let inner=`<span class="dnum">${c.d}</span>`;
+    if(on){ inner+=map[ds].map(n=>`<span class="qshift" title="${n}">${n}</span>`).join(''); }
+    html+=`<div class="${cls}">${inner}</div>`;
+  });
+  html+=`</div></div>`;
+  return html;
+}
+function renderQuery(){
+  const sid=document.getElementById('qStu').value;
+  const box=document.getElementById('qCal');
+  const map=sid?studentAttendedMap(sid):{};
+  const dates=Object.keys(map);
+  const ny=qM===11?qY+1:qY, nm=(qM+1)%12;
+  if(qMode==='one'){
+    box.innerHTML=renderQueryMonth(qY,qM,map);
+    document.getElementById('qTitle').textContent=monthLabel(qY,qM);
+  }else{
+    box.innerHTML=renderQueryMonth(qY,qM,map)+renderQueryMonth(ny,nm,map);
+    document.getElementById('qTitle').textContent=dualLabel(qY,qM,ny,nm);
+  }
+  if(sid){
+    const months=qMode==='one'?[[qY,qM]]:[[qY,qM],[ny,nm]];
+    const pref=months.map(([y,m])=>`${y}-${pad(m+1)}`);
+    const inDays=dates.filter(d=>pref.some(p=>d.indexOf(p)===0)).length;
+    const sessions=dates.reduce((a,d)=>a+map[d].length,0);
+    const rl=qMode==='one'?'本月':(qY===ny?`${qM+1}月、${nm+1}月两月`:`${qY}年${qM+1}月、${ny}年${nm+1}月两月`);
+    document.getElementById('qStat').innerHTML=
+      `<b>${stuName(sid)}</b> ${rl}已出勤 <b>${inDays}</b> 天，累计到勤 <b>${dates.length}</b> 天（共 <b>${sessions}</b> 次班次）。`;
+  }else{
+    document.getElementById('qStat').innerHTML=state.students.length?'请选择学员查看出勤统计。':'还没有学员，请先到「学员管理」添加学员。';
+  }
+}
+document.getElementById('qPrev').onclick=()=>{qM--;if(qM<0){qM=11;qY--;}renderQuery();};
+document.getElementById('qNext').onclick=()=>{qM++;if(qM>11){qM=0;qY++;}renderQuery();};
+document.getElementById('qStu').onchange=renderQuery;
+document.getElementById('qOne').onclick=()=>{qMode='one';document.getElementById('qOne').classList.add('on');document.getElementById('qTwo').classList.remove('on');renderQuery();};
+document.getElementById('qTwo').onclick=()=>{qMode='two';document.getElementById('qTwo').classList.add('on');document.getElementById('qOne').classList.remove('on');renderQuery();};
+
+/* ============ 班次总览 ============ */
+let rY=NOW.getFullYear(),rM=NOW.getMonth();
+function fillRosterCourseSelect(){ document.getElementById('rCourse').innerHTML=state.courses.filter(c=>c.active!==false).map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
+function renderRoster(){
+  const cid=document.getElementById('rCourse').value;
+  const course=state.courses.find(c=>c.id===cid);
+  document.getElementById('rTitle').textContent=`${rY}年${rM+1}月`;
+  if(!course){ document.getElementById('rBody').innerHTML=state.courses.length?'<div class="hint">请选择班次。</div>':'<div class="hint">还没有班次，请先到「班次管理」添加班次。</div>'; return; }
+  const students=state.students.filter(s=>s.courseIds.includes(cid));
+  const dim=new Date(rY,rM+1,0).getDate();
+  const sessDates=[];
+  for(let d=1;d<=dim;d++){ const ds=fmt(rY,rM,d); if(ds<=todayStr() && sessionsForDate(ds).some(s=>s.courseId===cid)) sessDates.push(ds); }
+  const should=sessDates.length;
+  let html=`<div class="stat">班次 <b>${course.name}</b> · ${rY}年${rM+1}月（仅统计到今天，应到 ${should} 次）</div>`;
+  if(!students.length){ html+='<div class="hint">该班次暂无学员。</div>'; }
+  else{
+    const rows=students.map(s=>{
+      let actual=0;
+      sessDates.forEach(ds=>{ const rec=state.attendance[ds+'__'+cid]; if(rec&&rec[s.id]) actual++; });
+      const rate=should?Math.round(actual/should*100):0;
+      return {s,actual,rate};
+    }).sort((a,b)=>a.rate-b.rate);
+    html+=`<table class="tbl"><thead><tr><th>学员</th><th>应到</th><th>实到</th><th>出勤率</th></tr></thead><tbody>`;
+    html+=rows.map(r=>`<tr><td>${r.s.active===false?'<s>'+r.s.name+'</s>':r.s.name}</td><td>${should}</td><td>${r.actual}</td><td class="${r.rate<60?'rate-low':''}">${r.rate}%</td></tr>`).join('');
+    html+='</tbody></table>';
+  }
+  document.getElementById('rBody').innerHTML=html;
+}
+document.getElementById('rPrev').onclick=()=>{rM--;if(rM<0){rM=11;rY--;}renderRoster();};
+document.getElementById('rNext').onclick=()=>{rM++;if(rM>11){rM=0;rY++;}renderRoster();};
+
+/* ============ 数据备份 ============ */
+function renderDataStat(){ document.getElementById('dataStat').innerHTML=`班次：${state.courses.length} ｜ 学员：${state.students.length} ｜ 例外：${state.exceptions.length} ｜ 已记录出勤场次：${Object.keys(state.attendance).length}`; }
+document.getElementById('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='attendance-backup-'+fmt(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+'.json'; a.click();
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const obj=JSON.parse(r.result);
+      if(!obj||obj.schema!==SCHEMA) throw new Error('备份文件版本不匹配');
+      state={schema:SCHEMA,courses:obj.courses||[],students:(obj.students||[]).map(s=>({active:true,...s,courseIds:Array.isArray(s.courseIds)?s.courseIds:[]})),attendance:obj.attendance||{},exceptions:obj.exceptions||[]};
+      persist(); refreshAll(); alert('导入成功，数据已恢复');
+    }catch(err){ alert('导入失败：'+err.message); }
+  };
+  r.readAsText(f);
+  e.target.value='';
+};
+document.getElementById('clearBtn').onclick=()=>{
+  if(!confirm('确定清空全部数据？此操作不可恢复（导入备份可还原）。')) return;
+  state=defaultState(); persist(); refreshAll(); alert('已清空');
+};
+document.getElementById('autoBackup').onchange=e=>setAutoBackup(e.target.checked);
+
+/* ============ 导航 ============ */
+let currentView='cal';
+function switchView(v){
+  currentView=v;
+  document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.view===v));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  const view=document.getElementById('view-'+v); if(view) view.classList.add('active');
+  if(v==='query') renderQuery();
+  if(v==='roster') renderRoster();
+  if(v==='data') renderDataStat();
+  closeDrawer();
+}
+function openDrawer(){ document.getElementById('menuOverlay').classList.add('show'); document.getElementById('drawer').classList.add('show'); }
+function closeDrawer(){ document.getElementById('menuOverlay').classList.remove('show'); document.getElementById('drawer').classList.remove('show'); }
+document.querySelectorAll('nav.tabs button').forEach(b=> b.onclick=()=>switchView(b.dataset.view));
+document.querySelectorAll('.drawer-item').forEach(b=> b.onclick=()=>switchView(b.dataset.view));
+document.getElementById('menuBtn').onclick=openDrawer;
+document.getElementById('menuClose').onclick=closeDrawer;
+document.getElementById('menuOverlay').onclick=closeDrawer;
+document.getElementById('csWeek').onchange=prefillCourseName;
+document.getElementById('csPeriod').onchange=prefillCourseName;
+document.getElementById('prevM').onclick=()=>{curM--;if(curM<0){curM=11;curY--;}renderCal();};
+document.getElementById('nextM').onclick=()=>{curM++;if(curM>11){curM=0;curY++;}renderCal();};
+document.getElementById('oneM').onclick=()=>{mode='one';document.getElementById('oneM').classList.add('on');document.getElementById('twoM').classList.remove('on');renderCal();};
+document.getElementById('twoM').onclick=()=>{mode='two';document.getElementById('twoM').classList.add('on');document.getElementById('oneM').classList.remove('on');renderCal();};
+
+/* ============ 启动 ============ */
+function refreshAll(){ fillWeekSelect(); prefillCourseName(); renderCourseList(); fillCourseChecks(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); renderCal(); renderQuery(); renderRoster(); renderDataStat(); }
+load();
+loadPrefs();
+refreshAll();
+</script>
+</body>
+</html>
