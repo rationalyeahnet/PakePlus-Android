@@ -53,14 +53,21 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
   .cell.out{background:#fafafa;color:#bcc2c9;}
   .cell.today{box-shadow:inset 0 0 0 2px var(--primary);}
   .cell.has-course{cursor:pointer;}
-  .cell.has-course:hover{background:var(--primary-soft);}
+  .cell.has-course:hover{filter:brightness(.96);}
+  /* 有课日的底色：过去=浅绿（可补录）、今天=深绿、未来=灰绿（不可录入） */
+  .cell.has-past{background:#c6e9cd;}
+  .cell.has-past .dnum{color:#1e6b2c;}
+  .cell.has-today{background:var(--ok);box-shadow:none;}
+  .cell.has-today .dnum{color:#fff;}
+  .cell.has-future{background:#dfe7e0;}
+  .cell.has-future .dnum{color:#7b8a80;}
   .cell .dnum{font-size:13px;font-weight:600;}
   .cell .course{margin-top:3px;font-size:11px;background:var(--primary-soft);color:var(--primary);border-radius:3px;padding:1px 4px;display:block;margin-bottom:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
   .cell .course.future{cursor:default;opacity:.6;}
   .cell .course.extra{background:#fdeccf;color:#8a5a00;}
-  .cell .ind{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--primary);}
-  .cell .ind-extra{background:var(--extra);}
-  .cell.future .ind{opacity:.4;}
+  /* 圆点仅用于标记「加课/补课」，普通有课日改用整格底色 */
+  .cell .ind{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--extra);}
+  .cell.future .ind{opacity:.45;}
   .cell .course:hover{filter:brightness(.96);}
   .legend{margin-top:10px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;}
   .legend span{display:inline-flex;align-items:center;gap:5px;}
@@ -73,10 +80,23 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
   .panel-head h3{font-size:15px;}
   .panel-head .sub{font-size:12px;color:var(--muted);margin-top:3px;}
   .panel-body{flex:1;overflow:auto;padding:12px 16px;}
-  .panel-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;}
+  .panel-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:stretch;gap:8px;}
+  .foot-row{display:flex;gap:8px;}
+  .foot-row .btn{flex:1;}
+  .btn.big{min-height:48px;font-size:15px;font-weight:600;}
+  .unsave-tip{display:none;background:var(--bad-bg);color:var(--bad);border:1px solid #eeb4ac;border-radius:4px;padding:8px 10px;font-size:12.5px;line-height:1.5;}
+  .unsave-tip.show{display:block;}
+  .dlg{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(100% - 40px);max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;z-index:50;box-shadow:0 8px 28px rgba(0,0,0,.18);}
+  .dlg.show{display:block;}
+  .overlay.dlg-mask{z-index:49;}   /* 必须高于面板(40)，否则确认框弹出时还能点到下面的面板 */
+  .dlg-title{font-size:15px;font-weight:600;margin-bottom:6px;}
+  .dlg-text{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+  .dlg-btns{display:flex;flex-direction:column;gap:8px;}
+  .bak-text{width:100%;height:200px;font-family:Consolas,Menlo,monospace;font-size:11px;line-height:1.5;border:1px solid var(--line);border-radius:4px;padding:8px;resize:vertical;color:var(--ink);background:#fff;}
   .close{cursor:pointer;color:var(--muted);font-size:20px;line-height:1;border:none;background:none;flex-shrink:0;}
   .dirty{display:none;align-self:flex-start;font-size:12px;color:var(--bad);border:1px solid #eccfcb;padding:1px 6px;border-radius:3px;flex-shrink:0;}
-  .stu-row{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);}
+  .stu-row{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;-webkit-tap-highlight-color:rgba(44,95,138,.12);}
+  .stu-row:active{background:var(--primary-soft);}
   .stu-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);}
   .stu-row .name{flex:1;font-size:14px;}
   .stu-row .state{font-size:12px;}
@@ -93,6 +113,7 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
   .field input[type=text]{min-width:170px;}
   .field input[type=date]{padding:6px 8px;border:1px solid var(--line);border-radius:3px;font-size:13px;}
   .checks{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;}
+  .list-opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
   .chk{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:3px;padding:4px 9px;font-size:13px;cursor:pointer;background:#fff;}
   .chk input{accent-color:var(--primary);}
   .list-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:11px 6px;border-bottom:1px solid var(--line);}
@@ -165,12 +186,13 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
         </div>
       </div>
     </div>
-    <div class="note">带<b>圆点</b>的日期表示有班次，点该日期即可查看当天具体班次并登记（单班直接登记，多班先选班）。<b>橙色圆点</b>为加课/补课（例外日期）。右上角「单月/双月」可切换，双月用于跨月排课对照。仅可登记<b>今天及以前</b>的日期，未来日期只显示不可登记。</div>
+    <div class="note">有班次的日期会用<b>整格底色</b>标出，点该日期即可查看当天具体班次并登记（单班直接登记，多班先选班）。<b>橙色圆点</b>为加课/补课（例外日期）。右上角「单月/双月」可切换，双月用于跨月排课对照。仅可登记<b>今天及以前</b>的日期，未来日期只显示不可登记。</div>
     <div class="cal-wrap" id="calWrap"></div>
     <div class="legend">
-      <span><i class="dot" style="background:var(--primary)"></i> 有班次（点日期看具体班次）</span>
+      <span><i class="dot" style="background:#c6e9cd;border:1px solid #a6d9b2"></i> 过去有课（可登记）</span>
+      <span><i class="dot" style="background:var(--ok)"></i> 今天有课</span>
+      <span><i class="dot" style="background:#dfe7e0;border:1px solid #c6d2c8"></i> 未来有课（不可登记）</span>
       <span><i class="dot" style="background:var(--extra)"></i> 加课/补课（例外日期）</span>
-      <span><i class="dot" style="background:var(--ok)"></i> 个人查询中：已出勤日期</span>
     </div>
   </section>
 
@@ -256,12 +278,11 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
       <h3>备份与恢复</h3>
       <div class="field">
         <button class="btn primary" id="exportBtn">导出备份(JSON)</button>
+        <button class="btn" id="copyBtn">复制 / 分享（备用）</button>
         <button class="btn" id="importBtn">导入备份</button>
         <input type="file" id="importFile" accept="application/json" style="display:none;">
       </div>
-      <div class="hint">导出文件可保存到手机下载目录或网盘；换手机/重装后通过「导入备份」恢复全部学员、班次、例外与出勤记录。</div>
-      <label class="chk" style="margin-top:10px;"><input type="checkbox" id="autoBackup"> 自动备份到下载目录（每次保存时导出一份带时间戳的备份文件）</label>
-      <div class="hint">开启后，每次保存都会在下载目录生成备份（如 attendance-auto-...json）。若打包后的 App 不支持下载，此选项无效，请仍用手动「导出备份」。</div>
+      <div class="hint">点「导出备份」会把 JSON <b>静默保存到系统的「下载」文件夹</b>（App 内通常<b>没有任何提示</b>，属正常）。若你找不到文件，点旁边的「复制 / 分享」可手动存一份到微信收藏、备忘录或网盘。换手机/重装后用「导入备份」恢复全部学员、班次、例外与出勤记录。</div>
     </div>
     <div class="card">
       <h3>当前数据量</h3>
@@ -289,7 +310,7 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
       <h4>二、数据保全（重要）</h4>
       <ul>
         <li>所有数据存在本机。请定期「导出备份」到下载目录/网盘。</li>
-        <li>系统自动只保留最近 <b>12 个月</b>的出勤与例外数据，更早的会在打开应用时清理（以控制体积）；如需长期留存请导出备份。</li>
+        <li>系统自动只保留最近 <b>36 个月</b>左右的出勤与例外数据：每月第一次打开应用时清理一次，更早的会被删除（实际保留 36～37 个月）；如需长期留存请导出备份。</li>
         <li>换手机或重装 App 后，用「导入备份」恢复。</li>
       </ul>
       <h4>三、打包成安卓 App（PakePlus）</h4>
@@ -317,7 +338,43 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
   </div>
   <div class="panel-body" id="pBody"></div>
   <div class="panel-foot" id="pFoot">
-    <button class="btn primary" id="pSave" style="flex:1;">保存本节课出勤</button>
+    <div class="unsave-tip" id="pUnsave">改动还没保存。关闭或离开前请点下方「保存本节课出勤」，否则本次勾选会全部丢失。</div>
+    <button class="btn primary big" id="pSave">保存本节课出勤</button>
+  </div>
+</div>
+
+<!-- 备份面板：App 内置 WebView 不触发下载，故提供复制 / 分享兜底 -->
+<div class="overlay" id="bakOverlay"></div>
+<div class="panel" id="bakPanel">
+  <div class="panel-head">
+    <div>
+      <h3>导出备份</h3>
+      <div class="sub" id="bakSub"></div>
+    </div>
+    <button class="close" id="bakClose">×</button>
+  </div>
+  <div class="panel-body">
+    <div class="hint" style="margin-bottom:8px;">这是<b>备用</b>导出方式。正常情况下「导出备份」会把文件静默存进系统<b>「下载」文件夹</b>；如果你在那里找不到，就用下面的「复制全部」或「分享」手动留一份。</div>
+    <textarea id="bakText" class="bak-text" readonly></textarea>
+  </div>
+  <div class="panel-foot">
+    <button class="btn primary big" id="bakDownload">保存至系统下载文件夹</button>
+    <div class="foot-row">
+      <button class="btn" id="bakCopy">复制全部</button>
+      <button class="btn" id="bakShare">分享</button>
+    </div>
+  </div>
+</div>
+
+<!-- 页面内确认框：不依赖 confirm()（App 的 WebView 常常不弹 JS 对话框） -->
+<div class="overlay dlg-mask" id="dlgOverlay"></div>
+<div class="dlg" id="dlg">
+  <div class="dlg-title">出勤还没保存</div>
+  <div class="dlg-text">这一课的勾选还没写入，直接关闭会丢失。</div>
+  <div class="dlg-btns">
+    <button class="btn primary big" id="dlgSave">保存并关闭</button>
+    <button class="btn" id="dlgCancel">返回继续登记</button>
+    <button class="btn danger" id="dlgDiscard">放弃本次登记</button>
   </div>
 </div>
 
@@ -325,6 +382,11 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
 /* ============ 数据层 ============ */
 const SCHEMA=1;
 const WEEK=['日','一','二','三','四','五','六'];
+/* 日历表头：周一为首列，周六、周日连排在最后。
+   注意 WEEK 是"下标=>名称"的映射（班次 weekday 存的就是下标），不能重排，故另建表头数组。 */
+const WEEK_HEAD=[1,2,3,4,5,6,0].map(i=>WEEK[i]);
+/* 本地解析日期取星期：new Date('YYYY-MM-DD') 按 UTC 解析，负偏移时区 getDay() 会错一天 */
+const weekdayOf=ds=>{const [y,m,d]=ds.split('-').map(Number);return new Date(y,m-1,d).getDay();};
 const STORE_KEY='attendance_app_v1';
 
 function defaultState(){
@@ -353,29 +415,13 @@ function load(){
     };
     // 兼容旧数据：补全字段
     state.students=state.students.map(s=>({active:true,...s,courseIds:Array.isArray(s.courseIds)?s.courseIds:[]}));
-    const removed=pruneOld();
+    // 每月首次启动清理一次即可，不必每次启动都扫
+    const removed=pruneIfNeeded();
     if(removed>0) persist();
   }catch(e){ console.warn('读取本地数据失败',e); }
 }
-let autoBackupOn=false;
 function persist(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){ alert('保存失败：'+e.message); }
-  if(autoBackupOn) autoBackup();
-}
-function loadPrefs(){
-  autoBackupOn = localStorage.getItem('att_auto')==='1';
-  const cb=document.getElementById('autoBackup'); if(cb) cb.checked=autoBackupOn;
-}
-function setAutoBackup(v){ autoBackupOn=v; localStorage.setItem('att_auto', v?'1':'0'); }
-function autoBackup(){
-  try{
-    const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    const d=new Date();
-    a.download='attendance-auto-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.json';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-  }catch(e){ /* 该环境不支持下载则忽略 */ }
 }
 
 /* ============ 工具 ============ */
@@ -386,10 +432,23 @@ const stuName=id=>{const s=state.students.find(x=>x.id===id);return s?s.name:id;
 const uid=p=>p+Date.now()+Math.floor(Math.random()*1000);
 const todayStr=()=>{const d=new Date();return fmt(d.getFullYear(),d.getMonth(),d.getDate());};
 
-/* 数据保留：最多保留最近 12 个月，更早的自动清理 */
+/* 数据保留：最多保留最近 RETENTION_MONTHS 个月，更早的自动清理（改这个数即可调整保留期） */
+const RETENTION_MONTHS=36;
+const PRUNE_KEY='attendance_last_prune';   // 记录上次清理的月份，避免每次启动都重写整个库
+/* 按月对齐的裁剪线：36 个月前「那个月的 1 号」。
+   配合每月只清一次，实际保留时长在 36～37 个月之间（最长 36 个月零 30 天）。 */
 function retentionCutoff(){
-  const d=new Date(); d.setMonth(d.getMonth()-12);
-  return fmt(d.getFullYear(),d.getMonth(),d.getDate());
+  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-RETENTION_MONTHS);
+  return fmt(d.getFullYear(),d.getMonth(),1);
+}
+/* 仅在本月第一次启动时清理；同月内再次启动直接跳过，不做任何读写 */
+function pruneIfNeeded(){
+  const d=new Date(), tag=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  let last=null; try{ last=localStorage.getItem(PRUNE_KEY); }catch(e){}
+  if(last===tag) return 0;
+  const removed=pruneOld();
+  try{ localStorage.setItem(PRUNE_KEY,tag); }catch(e){}
+  return removed;
 }
 function pruneOld(){
   const cut=retentionCutoff(); let n=0;
@@ -405,9 +464,7 @@ function pruneOld(){
 
 /* 某日期实际有哪些课（含正常按星期 + 例外） */
 function sessionsForDate(dateStr){
-  // 按本地时间解析：new Date('YYYY-MM-DD') 会按 UTC 解析，再取本地 getDay() 会整差一天星期
-  const [yy,mm,dd]=dateStr.split('-').map(Number);
-  const wd=new Date(yy,mm-1,dd).getDay();
+  const wd=weekdayOf(dateStr);
   const out=[];
   state.courses.forEach(c=>{
     if(c.active===false) return;
@@ -426,7 +483,7 @@ let curY=NOW.getFullYear(),curM=NOW.getMonth(),mode='one';
 function monthLabel(y,m){ return `${y}年${m+1}月`; }
 function dualLabel(y1,m1,y2,m2){ return y1===y2?`${y1}年${m1+1}月 / ${m2+1}月`:`${y1}年${m1+1}月 / ${y2}年${m2+1}月`; }
 function buildMatrix(y,m){
-  const first=new Date(y,m,1), start=first.getDay();
+  const first=new Date(y,m,1), start=(first.getDay()+6)%7; // 周一为首列
   const days=new Date(y,m+1,0).getDate(), prevDays=new Date(y,m,0).getDate();
   const cells=[];
   for(let i=start-1;i>=0;i--) cells.push({d:prevDays-i,inMonth:false});
@@ -436,7 +493,7 @@ function buildMatrix(y,m){
 }
 function renderCalOne(y,m){
   const cells=buildMatrix(y,m);
-  let html=`<div class="cal"><div class="cal-head">${WEEK.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
+  let html=`<div class="cal"><div class="cal-head">${WEEK_HEAD.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
   cells.forEach(c=>{
     if(!c.inMonth){ html+=`<div class="cell out"><span class="dnum">${c.d}</span></div>`; return; }
     const dateStr=fmt(y,m,c.d);
@@ -444,14 +501,15 @@ function renderCalOne(y,m){
     const future=dateStr>todayStr();
     const sessions=sessionsForDate(dateStr);
     const isToday=(y===NOW.getFullYear()&&m===NOW.getMonth()&&c.d===NOW.getDate());
-    let cls='cell'+(isToday?' today':''), inner=`<span class="dnum">${c.d}</span>`, click='';
+    let cls='cell'+(isToday?' today':''), inner=`<span class="dnum">${c.d}</span>`, click='', title='';
     if(sessions.length){
-      cls+=' has-course';
-      const hasExtra=sessions.some(s=>s.extra);
-      inner+=`<span class="ind ${hasExtra?'ind-extra':''}" title="${sessions.map(s=>s.name).join('、')}"></span>`;
+      cls+=' has-course '+(future?'has-future':(isToday?'has-today':'has-past'));
+      title=` title="${sessions.map(s=>s.name).join('、')}"`;
+      // 橙点仅保留给「加课/补课」，普通有课日靠整格底色区分
+      if(sessions.some(s=>s.extra)) inner+=`<span class="ind"></span>`;
       click=future?`onclick="futureNotice()"`:`onclick="openDay('${dateStr}')"`;
     }
-    html+=`<div class="${cls}" ${click}>${inner}</div>`;
+    html+=`<div class="${cls}"${title} ${click}>${inner}</div>`;
   });
   html+=`</div></div>`;
   return {html,label:`${y}年${m+1}月`};
@@ -474,10 +532,15 @@ function futureNotice(){ alert('只能登记今天及以前的日期，未来日
 
 /* ============ 面板：选班 -> 登记 ============ */
 let activeDate=null,activeCourse=null,activeShifts=[],dirty=false,exCid=null;
-function updateDirty(){ const el=document.getElementById('pDirty'); if(el) el.style.display=dirty?'inline':'none'; }
+function updateDirty(){
+  const el=document.getElementById('pDirty'); if(el) el.style.display=dirty?'inline':'none';
+  const tip=document.getElementById('pUnsave'); if(tip) tip.classList.toggle('show',dirty);
+  const sv=document.getElementById('pSave'); if(sv) sv.textContent=dirty?'保存本节课出勤 ●':'保存本节课出勤';
+}
 function openDay(dateStr){
   if(dateStr>todayStr()){ futureNotice(); return; }
   activeDate=dateStr;
+  activeCourse=null;               // 多班次/无班次时不残留上一节课，避免误判未保存
   activeShifts=sessionsForDate(dateStr);
   if(!activeShifts.length){ showEmpty(); return; }
   if(activeShifts.length===1){ openRoll(dateStr,activeShifts[0].courseId); return; }
@@ -491,7 +554,7 @@ function showEmpty(){
 }
 function showChooser(){
   document.getElementById('pTitle').textContent='选择班次';
-  document.getElementById('pSub').textContent=activeDate+'（周'+WEEK[new Date(activeDate).getDay()]+'）';
+  document.getElementById('pSub').textContent=activeDate+'（周'+WEEK[weekdayOf(activeDate)]+'）';
   document.getElementById('pFoot').style.display='none';
   document.getElementById('pBody').innerHTML=activeShifts.map(co=>`
     <div class="shift-row" onclick="openRoll('${activeDate}','${co.courseId}')">
@@ -507,7 +570,7 @@ function openRoll(dateStr,courseId){
   const ids=state.students.filter(s=>s.courseIds.includes(courseId) && s.active!==false).map(s=>s.id);
   const rec=state.attendance[dateStr+'__'+courseId]||{};
   document.getElementById('pTitle').textContent='出勤登记';
-  document.getElementById('pSub').textContent=course.name+' · '+dateStr+'（周'+WEEK[new Date(dateStr).getDay()]+'）';
+  document.getElementById('pSub').textContent=course.name+' · '+dateStr+'（周'+WEEK[weekdayOf(dateStr)]+'）';
   document.getElementById('pFoot').style.display='flex';
   let html='';
   if(activeShifts.length>1) html+=`<div class="shift-row back" onclick="showChooser()">← 重选班次</div>`;
@@ -520,7 +583,7 @@ function openRoll(dateStr,courseId){
       <span class="spacer"></span><span class="meta" id="pCount"></span>
     </div>`;
     html+=ids.map(id=>`
-      <div class="stu-row">
+      <div class="stu-row" id="row_${id}">
         <input type="checkbox" id="ck_${id}" ${rec[id]?'checked':''}>
         <span class="name">${stuName(id)}</span>
         <span class="state" id="st_${id}">${rec[id]?'已到':'未到'}</span>
@@ -529,38 +592,75 @@ function openRoll(dateStr,courseId){
   document.getElementById('pBody').innerHTML=html;
   if(ids.length){
     ids.forEach(id=>{
-      document.getElementById('ck_'+id).addEventListener('change',e=>{
-        document.getElementById('st_'+id).textContent=e.target.checked?'已到':'未到';
-        dirty=true; updateDirty(); updateCount();
-      });
+      const ck=document.getElementById('ck_'+id), st=document.getElementById('st_'+id), row=document.getElementById('row_'+id);
+      const apply=()=>{ st.textContent=ck.checked?'已到':'未到'; dirty=true; updateDirty(); updateCount(); };
+      ck.addEventListener('change',apply);
+      // 整行可点：手机上复选框太小，点名字区域也应能切换（否则会漏登记且 dirty 不置位）
+      row.addEventListener('click',e=>{ if(e.target===ck) return; ck.checked=!ck.checked; apply(); });
     });
     updateCount();
   }
   openPanel();
 }
 function updateCount(){
+  // 必须统计「当前勾选」，而不是已保存记录：否则点完人数字不刷新，看起来像没生效
   const ids=state.students.filter(s=>s.courseIds.includes(activeCourse) && s.active!==false).map(s=>s.id);
-  const rec=state.attendance[activeDate+'__'+activeCourse]||{};
-  const n=ids.filter(id=>rec[id]).length;
+  const n=ids.filter(id=>{ const c=document.getElementById('ck_'+id); return !!(c&&c.checked); }).length;
   const el=document.getElementById('pCount'); if(el) el.textContent=`已到勤 ${n}/${ids.length} 人`;
 }
 window.selAll=()=>{ state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).forEach(s=>{const c=document.getElementById('ck_'+s.id);if(c){c.checked=true;document.getElementById('st_'+s.id).textContent='已到';}});dirty=true;updateDirty();updateCount(); };
 window.selNone=()=>{ state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).forEach(s=>{const c=document.getElementById('ck_'+s.id);if(c){c.checked=false;document.getElementById('st_'+s.id).textContent='未到';}});dirty=true;updateDirty();updateCount(); };
 function openPanel(){ document.getElementById('overlay').classList.add('show'); document.getElementById('panel').classList.add('show'); }
 function closePanel(){ document.getElementById('overlay').classList.remove('show'); document.getElementById('panel').classList.remove('show'); activeDate=activeCourse=null; }
-function tryClosePanel(){ if(dirty && !confirm('有未保存的修改，确定放弃？')) return; dirty=false; updateDirty(); closePanel(); }
+function tryClosePanel(){
+  // 除 dirty 标记外，再直接比对一次勾选与已存记录，避免标记丢失导致静默关闭
+  if(!dirty && !hasUnsavedChanges()){ finishClose(); return; }
+  // 不用 confirm()：App 的 WebView 未必实现 JS 对话框，会静默返回 false
+  askUnsaved(r=>{
+    if(r==='cancel') return;        // 返回继续登记
+    if(r==='save'){ saveRoll(); return; }
+    finishClose();                  // 放弃
+  });
+}
+/* 直接比对当前勾选与已保存记录：即使 dirty 标记意外丢失也能发现未保存改动 */
+function hasUnsavedChanges(){
+  if(!activeCourse||!activeDate) return false;
+  const ids=state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).map(s=>s.id);
+  const rec=state.attendance[activeDate+'__'+activeCourse]||{};
+  return ids.some(id=>{ const c=document.getElementById('ck_'+id); return (!!(c&&c.checked))!==!!rec[id]; });
+}
+function finishClose(){ dirty=false; updateDirty(); closePanel(); }
+// 关闭页面/切走前的最后一道提醒（浏览器环境有效）
+window.addEventListener('beforeunload',e=>{ if(!dirty) return; e.preventDefault(); e.returnValue=''; });
 document.getElementById('pClose').onclick=tryClosePanel;
 document.getElementById('overlay').onclick=tryClosePanel;
-document.getElementById('pSave').onclick=()=>{
+/* 页面内确认框（替代 confirm）：App 的 WebView 常不实现 onJsConfirm，confirm() 会静默失败 */
+let dlgCb=null;
+function askUnsaved(cb){
+  dlgCb=cb;
+  document.getElementById('dlgOverlay').classList.add('show');
+  document.getElementById('dlg').classList.add('show');
+}
+function answerAsk(r){
+  document.getElementById('dlgOverlay').classList.remove('show');
+  document.getElementById('dlg').classList.remove('show');
+  const cb=dlgCb; dlgCb=null; if(cb) cb(r);
+}
+document.getElementById('dlgSave').onclick=()=>answerAsk('save');
+document.getElementById('dlgCancel').onclick=()=>answerAsk('cancel');
+document.getElementById('dlgDiscard').onclick=()=>answerAsk('discard');
+document.getElementById('dlgOverlay').onclick=()=>answerAsk('cancel');
+document.getElementById('pSave').onclick=saveRoll;
+function saveRoll(){
   if(!activeCourse) return;
   const ids=state.students.filter(s=>s.courseIds.includes(activeCourse)&&s.active!==false).map(s=>s.id);
   const rec={};
-  ids.forEach(id=>{ if(document.getElementById('ck_'+id).checked) rec[id]=true; });
+  ids.forEach(id=>{ const c=document.getElementById('ck_'+id); if(c&&c.checked) rec[id]=true; });
   state.attendance[activeDate+'__'+activeCourse]=rec;
   dirty=false; updateDirty(); persist(); closePanel();
   if(currentView==='query') renderQuery();
   if(currentView==='roster') renderRoster();
-};
+}
 
 /* ============ 例外日期管理 ============ */
 function openExceptionManager(cid){
@@ -623,8 +723,13 @@ function renderCourseList(){
   const box=document.getElementById('courseList');
   if(!state.courses.length){ box.innerHTML='<div class="hint">还没有班次。</div>'; return; }
   const showDisabled=document.getElementById('showDisabledCourses') && document.getElementById('showDisabledCourses').checked;
+  // 「停用/删除」默认隐藏，避免误触并压缩列表高度；已停用的项始终保留「启用」以便恢复
+  const manage=document.getElementById('manageCourses') && document.getElementById('manageCourses').checked;
   const list=state.courses.filter(c=> c.active!==false || showDisabled);
-  let html=`<label class="chk" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="showDisabledCourses" ${showDisabled?'checked':''} onchange="renderCourseList()"> 显示已停用的班次</label>`;
+  let html=`<div class="list-opts">
+      <label class="chk"><input type="checkbox" id="showDisabledCourses" ${showDisabled?'checked':''} onchange="renderCourseList()"> 显示已停用的班次</label>
+      <label class="chk"><input type="checkbox" id="manageCourses" ${manage?'checked':''} onchange="renderCourseList()"> 停用 / 删除班次</label>
+    </div>`;
   html+=list.map(c=>{
     if(editingCourseId===c.id){
       const wk=WEEK.map((w,i)=>`<option value="${i}" ${i===c.weekday?'selected':''}>周${w}</option>`).join('');
@@ -653,10 +758,10 @@ function renderCourseList(){
           <button class="btn" onclick="editCourse('${c.id}')">编辑</button>
           <button class="btn" onclick="openExceptionManager('${c.id}')">例外</button>
         </div>
-        <div class="acts-row">
+        ${(manage||off)?`<div class="acts-row">
           ${off?`<button class="btn primary" onclick="setCourseActive('${c.id}',true)">启用</button>`:`<button class="btn danger" onclick="setCourseActive('${c.id}',false)">停用</button>`}
-          <button class="btn danger" onclick="deleteCourse('${c.id}')">删除</button>
-        </div>
+          ${manage?`<button class="btn danger" onclick="deleteCourse('${c.id}')">删除</button>`:''}
+        </div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -703,8 +808,13 @@ function renderStuList(){
   const box=document.getElementById('stuList');
   if(!state.students.length){ box.innerHTML='<div class="hint">还没有学员。</div>'; return; }
   const showDisabled=document.getElementById('showDisabledStu') && document.getElementById('showDisabledStu').checked;
+  // 「停用/删除」默认隐藏；已退出的学员始终保留「启用」以便恢复
+  const manage=document.getElementById('manageStu') && document.getElementById('manageStu').checked;
   const list=state.students.filter(s=> s.active!==false || showDisabled);
-  let html=`<label class="chk" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="showDisabledStu" ${showDisabled?'checked':''} onchange="renderStuList()"> 显示已停用的学员</label>`;
+  let html=`<div class="list-opts">
+      <label class="chk"><input type="checkbox" id="showDisabledStu" ${showDisabled?'checked':''} onchange="renderStuList()"> 显示已停用的学员</label>
+      <label class="chk"><input type="checkbox" id="manageStu" ${manage?'checked':''} onchange="renderStuList()"> 停用 / 删除学员</label>
+    </div>`;
   html+=list.map(s=>{
     if(editingStuId===s.id){
       const chk=state.courses.map(c=>`<label class="chk"><input type="checkbox" value="${c.id}" ${s.courseIds.includes(c.id)?'checked':''}>${c.name}</label>`).join('');
@@ -731,10 +841,10 @@ function renderStuList(){
         <div class="acts-row">
           <button class="btn" onclick="editStu('${s.id}')">编辑</button>
         </div>
-        <div class="acts-row">
+        ${(manage||left)?`<div class="acts-row">
           ${left?`<button class="btn primary" onclick="setStuActive('${s.id}',true)">启用</button>`:`<button class="btn" onclick="setStuActive('${s.id}',false)">停用</button>`}
-          <button class="btn danger" onclick="deleteStu('${s.id}')">删除</button>
-        </div>
+          ${manage?`<button class="btn danger" onclick="deleteStu('${s.id}')">删除</button>`:''}
+        </div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -786,7 +896,7 @@ function studentAttendedMap(sid){
 let qMode='one';
 function renderQueryMonth(y,m,map){
   const cells=buildMatrix(y,m);
-  let html=`<div class="cal"><div class="cal-head">${WEEK.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
+  let html=`<div class="cal"><div class="cal-head">${WEEK_HEAD.map(w=>`<div>${w}</div>`).join('')}</div><div class="cal-grid">`;
   cells.forEach(c=>{
     if(!c.inMonth){ html+=`<div class="cell out"><span class="dnum">${c.d}</span></div>`; return; }
     const ds=fmt(y,m,c.d), on=!!map[ds], isToday=(y===NOW.getFullYear()&&m===NOW.getMonth()&&c.d===NOW.getDate());
@@ -862,10 +972,55 @@ document.getElementById('rNext').onclick=()=>{rM++;if(rM>11){rM=0;rY++;}renderRo
 
 /* ============ 数据备份 ============ */
 function renderDataStat(){ document.getElementById('dataStat').innerHTML=`班次：${state.courses.length} ｜ 学员：${state.students.length} ｜ 例外：${state.exceptions.length} ｜ 已记录出勤场次：${Object.keys(state.attendance).length}`; }
-document.getElementById('exportBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='attendance-backup-'+fmt(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+'.json'; a.click();
+/* 备份：App 内 WebView 不触发下载，故统一走面板，提供 复制 / 分享 / 下载 三种出路 */
+function backupText(){ return JSON.stringify(state,null,2); }
+function backupName(){ const d=new Date(); return 'attendance-backup-'+fmt(d.getFullYear(),d.getMonth(),d.getDate())+'.json'; }
+function openBackup(){
+  const t=backupText();
+  document.getElementById('bakText').value=t;
+  document.getElementById('bakSub').textContent=backupName()+' · '+t.length+' 字符';
+  document.getElementById('bakOverlay').classList.add('show');
+  document.getElementById('bakPanel').classList.add('show');
+}
+function closeBackup(){
+  document.getElementById('bakOverlay').classList.remove('show');
+  document.getElementById('bakPanel').classList.remove('show');
+}
+function copyText(ta){
+  ta.focus(); ta.select(); try{ ta.setSelectionRange(0,ta.value.length); }catch(e){}
+  try{ if(document.execCommand('copy')) return true; }catch(e){}
+  return false;
+}
+document.getElementById('exportBtn').onclick=openBackup;
+document.getElementById('bakClose').onclick=closeBackup;
+document.getElementById('bakOverlay').onclick=closeBackup;
+document.getElementById('bakCopy').onclick=()=>{
+  const ta=document.getElementById('bakText');
+  if(copyText(ta)){ alert('已复制。粘贴到微信收藏 / 备忘录 / 网盘保存即可。'); return; }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(
+      ()=>alert('已复制。粘贴到微信收藏 / 备忘录 / 网盘保存即可。'),
+      ()=>alert('复制失败，请长按文本框手动全选复制。'));
+    return;
+  }
+  alert('复制失败，请长按文本框手动全选复制。');
+};
+document.getElementById('bakShare').onclick=()=>{
+  try{
+    const f=new File([backupText()],backupName(),{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){ navigator.share({files:[f],title:'出勤备份'}).catch(()=>{}); return; }
+    if(navigator.share){ navigator.share({title:'出勤备份',text:backupText()}).catch(()=>{}); return; }
+  }catch(e){}
+  alert('当前环境不支持分享，请改用「复制全部」。');
+};
+document.getElementById('bakDownload').onclick=()=>{
+  try{
+    const blob=new Blob([backupText()],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=backupName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    alert('已触发下载。若 App 内无反应，请用「复制全部」或「分享」。');
+  }catch(e){ alert('当前环境不支持下载，请改用「复制全部」或「分享」。'); }
 };
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
 document.getElementById('importFile').onchange=e=>{
@@ -886,7 +1041,6 @@ document.getElementById('clearBtn').onclick=()=>{
   if(!confirm('确定清空全部数据？此操作不可恢复（导入备份可还原）。')) return;
   state=defaultState(); persist(); refreshAll(); alert('已清空');
 };
-document.getElementById('autoBackup').onchange=e=>setAutoBackup(e.target.checked);
 
 /* ============ 导航 ============ */
 let currentView='cal';
@@ -917,7 +1071,6 @@ document.getElementById('twoM').onclick=()=>{mode='two';document.getElementById(
 /* ============ 启动 ============ */
 function refreshAll(){ fillWeekSelect(); prefillCourseName(); renderCourseList(); fillCourseChecks(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); renderCal(); renderQuery(); renderRoster(); renderDataStat(); }
 load();
-loadPrefs();
 refreshAll();
 </script>
 </body>
