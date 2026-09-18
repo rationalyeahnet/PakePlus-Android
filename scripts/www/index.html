@@ -65,9 +65,13 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
   .cell .course{margin-top:3px;font-size:11px;background:var(--primary-soft);color:var(--primary);border-radius:3px;padding:1px 4px;display:block;margin-bottom:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
   .cell .course.future{cursor:default;opacity:.6;}
   .cell .course.extra{background:#fdeccf;color:#8a5a00;}
-  /* 圆点仅用于标记「加课/补课」，普通有课日改用整格底色 */
-  .cell .ind{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;background:var(--extra);}
+  /* 右上橙色圆点：加课/补课（例外日期） */
+  .cell .ind{position:absolute;right:5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--extra);}
   .cell.future .ind{opacity:.45;}
+  /* 右下圆点：当天班次登记完成度。绿=全部已登记，红=仍有未登记（“无人出勤”也算已登记） */
+  .cell .done,.cell .todo{position:absolute;right:5px;bottom:5px;width:9px;height:9px;border-radius:50%;}
+  .cell .done{background:var(--ok);}
+  .cell .todo{background:var(--bad);}
   .cell .course:hover{filter:brightness(.96);}
   .legend{margin-top:10px;font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;}
   .legend span{display:inline-flex;align-items:center;gap:5px;}
@@ -186,13 +190,15 @@ nav.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);f
         </div>
       </div>
     </div>
-    <div class="note">有班次的日期会用<b>整格底色</b>标出，点该日期即可查看当天具体班次并登记（单班直接登记，多班先选班）。<b>橙色圆点</b>为加课/补课（例外日期）。右上角「单月/双月」可切换，双月用于跨月排课对照。仅可登记<b>今天及以前</b>的日期，未来日期只显示不可登记。</div>
+    <div class="note">有班次的日期会用<b>整格底色</b>标出，点该日期即可查看当天具体班次并登记（单班直接登记，多班先选班）。<b>右下圆点</b>表示当天登记完成度：<b>绿点</b>=当天班次已全部登记（含"无人出勤"），<b>红点</b>=仍有班次未登记。<b>右上橙色圆点</b>为加课/补课（例外日期）。右上角「单月/双月」可切换，双月用于跨月排课对照。仅可登记<b>今天及以前</b>的日期，未来日期只显示不可登记。</div>
     <div class="cal-wrap" id="calWrap"></div>
     <div class="legend">
       <span><i class="dot" style="background:#c6e9cd;border:1px solid #a6d9b2"></i> 过去有课（可登记）</span>
       <span><i class="dot" style="background:var(--ok)"></i> 今天有课</span>
       <span><i class="dot" style="background:#dfe7e0;border:1px solid #c6d2c8"></i> 未来有课（不可登记）</span>
       <span><i class="dot" style="background:var(--extra)"></i> 加课/补课（例外日期）</span>
+      <span><i class="dot" style="background:var(--ok);border-radius:50%"></i> 当天已全部登记</span>
+      <span><i class="dot" style="background:var(--bad);border-radius:50%"></i> 当天还有未登记</span>
     </div>
   </section>
 
@@ -476,6 +482,13 @@ function sessionsForDate(dateStr){
   });
   return out;
 }
+/* 某日期某班次是否「已完成登记」：只要存在出勤记录 key 即为已登记（空 {} 表示“无人出勤”，同样算已登记）。
+   没有学生的班次视为无需登记、直接算完成。 */
+function sessionCompleted(dateStr,courseId){
+  if(Object.prototype.hasOwnProperty.call(state.attendance, dateStr+'__'+courseId)) return true;
+  const hasStu=state.students.some(s=>s.courseIds.includes(courseId) && s.active!==false);
+  return !hasStu;
+}
 
 /* ============ 日历 ============ */
 const NOW=new Date();
@@ -505,8 +518,12 @@ function renderCalOne(y,m){
     if(sessions.length){
       cls+=' has-course '+(future?'has-future':(isToday?'has-today':'has-past'));
       title=` title="${sessions.map(s=>s.name).join('、')}"`;
-      // 橙点仅保留给「加课/补课」，普通有课日靠整格底色区分
+      // 右上橙点：加课/补课；右下绿/红点：当天登记完成度（仅过去/今天，未来不显示）
       if(sessions.some(s=>s.extra)) inner+=`<span class="ind"></span>`;
+      if(!future){
+        const allDone=sessions.every(s=>sessionCompleted(dateStr,s.courseId));
+        inner+=`<span class="${allDone?'done':'todo'}"></span>`;
+      }
       click=future?`onclick="futureNotice()"`:`onclick="openDay('${dateStr}')"`;
     }
     html+=`<div class="${cls}"${title} ${click}>${inner}</div>`;
@@ -658,6 +675,7 @@ function saveRoll(){
   ids.forEach(id=>{ const c=document.getElementById('ck_'+id); if(c&&c.checked) rec[id]=true; });
   state.attendance[activeDate+'__'+activeCourse]=rec;
   dirty=false; updateDirty(); persist(); closePanel();
+  renderCal();                                   // 立即刷新日历完成度圆点（否则要切月才更新）
   if(currentView==='query') renderQuery();
   if(currentView==='roster') renderRoster();
 }
@@ -859,7 +877,7 @@ window.deleteStu=id=>{
   if(!confirm('彻底删除该学员？将同时删除该学员的全部出勤记录（不可恢复）。\n仅用于删除误添加的学员；若想保留历史记录请改用「停用」。')) return;
   state.students=state.students.filter(s=>s.id!==id);
   for(const k of Object.keys(state.attendance)){ const rec=state.attendance[k]; if(rec&&rec[id]){ delete rec[id]; if(Object.keys(rec).length===0) delete state.attendance[k]; } }
-  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); renderCal(); if(currentView==='query') renderQuery();
 };
 window.editStu=id=>{ editingStuId=id; renderStuList(); };
 window.cancelStuEdit=()=>{ editingStuId=null; renderStuList(); };
@@ -869,7 +887,7 @@ window.saveStu=id=>{
   if(!name){ alert('姓名不能为空'); return; }
   const ids=[...document.querySelectorAll('#stuList input[type=checkbox]:checked')].map(i=>i.value);
   s.name=name; s.courseIds=ids; s.active=document.getElementById('stStatus').value!=='left';
-  editingStuId=null; persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+  editingStuId=null; persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); renderCal(); if(currentView==='query') renderQuery();
 };
 document.getElementById('addStu').onclick=()=>{
   const name=document.getElementById('stuName').value.trim();
@@ -879,12 +897,32 @@ document.getElementById('addStu').onclick=()=>{
   state.students.push({id:uid('s'),name,courseIds:ids,active:true});
   document.getElementById('stuName').value='';
   document.querySelectorAll('#stuCourses input').forEach(i=>i.checked=false);
-  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); if(currentView==='query') renderQuery();
+  persist(); renderStuList(); fillQuerySelect(); fillRosterCourseSelect(); renderCal(); if(currentView==='query') renderQuery();
 };
 
 /* ============ 个人查询 ============ */
 let qY=NOW.getFullYear(),qM=NOW.getMonth();
-function fillQuerySelect(){ document.getElementById('qStu').innerHTML=state.students.map(s=>`<option value="${s.id}">${s.name}${s.active===false?'（已退出）':''}</option>`).join(''); }
+/* 学员在“选择学员”里的排序基准：按所属班次的星期，从周一到周日；
+   跨多个班次者以“最靠前”的那个班次为准。 */
+function studentSortKey(s){
+  let best=99;
+  for(const cid of s.courseIds){
+    const c=state.courses.find(x=>x.id===cid);
+    if(c) best=Math.min(best,(c.weekday+6)%7);   // 周一(1)->0 … 周六(6)->5，周日(0)->6
+  }
+  return best;
+}
+function fillQuerySelect(){
+  const sel=document.getElementById('qStu');
+  const prev=sel.value;
+  const arr=state.students.slice().sort((a,b)=>{
+    const ka=studentSortKey(a), kb=studentSortKey(b);
+    if(ka!==kb) return ka-kb;
+    return a.name.localeCompare(b.name,'zh');
+  });
+  sel.innerHTML=arr.map(s=>`<option value="${s.id}">${s.name}${s.active===false?'（已退出）':''}</option>`).join('');
+  if(prev && arr.some(s=>s.id===prev)) sel.value=prev;
+}
 function studentAttendedMap(sid){
   const m={};
   for(const k in state.attendance){
