@@ -254,13 +254,14 @@ App.pages.calendar = (function () {
       const rec = store.monthlyReceivable(s.id, month);
       const paid = store.data.payments
         .filter(p => p.studentId === s.id && p.month === month && p.type === 'settle')
-        .reduce((a, p) => a + Number(p.received), 0);
-      const bal = store.balance(s.id);
-      const balTxt = bal === 0
+        .reduce((a, p) => a + Number(p.diffType === 'waive' ? p.receivable : p.received), 0);
+      // 本月差额 = 本月应收 − 本月已收（点行结账上下文，欠=未收齐；抹零笔按核销后应收计，抹零月差额归零=结清）
+      const diff = rec - paid;
+      const balTxt = diff === 0
         ? '<span class="hint">结清</span>'
-        : bal < 0
-          ? '<span class="money money-neg">欠 ' + Utils.fmtMoney(-bal) + '</span>'
-          : '<span class="money money-pos">余 ' + Utils.fmtMoney(bal) + '</span>';
+        : diff < 0
+          ? '<span class="money money-pos">余 ' + Utils.fmtMoney(-diff) + '</span>'
+          : '<span class="money money-neg">欠 ' + Utils.fmtMoney(diff) + '</span>';
       return '<tr class="row-link" data-sid="' + s.id + '">' +
         '<td style="font-weight:600;">' + esc(s.name) + '</td>' +
         '<td>' + count + '/' + should + '</td>' +
@@ -273,7 +274,7 @@ App.pages.calendar = (function () {
       '<div class="card-title">' + Utils.monthLabel(month) + ' 汇总 <span class="hint" style="font-weight:400;">出勤=实到/应到，点行结账</span></div>' +
       '<div class="table-wrap"><table class="list">' +
         '<colgroup><col style="width:24%"><col style="width:14%"><col style="width:18%"><col style="width:20%"><col style="width:24%"></colgroup>' +
-        '<thead><tr><th>学生</th><th>出勤</th><th>应收</th><th>本月已收</th><th>余额</th></tr></thead>' +
+        '<thead><tr><th>学生</th><th>出勤</th><th>应收</th><th>本月已收</th><th>本月差额</th></tr></thead>' +
         '<tbody>' + rowsHtml + '</tbody>' +
       '</table></div>' +
     '</div>';
@@ -303,6 +304,7 @@ App.pages.calendar = (function () {
 
     // 汇总表行点击 → 结账
     el.querySelector('#cal-foot').addEventListener('click', function (e) {
+      e.stopPropagation(); // 只开结账弹窗，不冒泡给其他容器级委托
       const tr = e.target.closest('tr[data-sid]');
       if (tr) openSettle(tr.dataset.sid, viewMonth);
     });
@@ -1001,6 +1003,12 @@ App.pages.calendar = (function () {
     });
     bindSettleForm(mask, studentId, month);
     mask.addEventListener('click', function (e) {
+      // 弹窗内的「历史 / 查看完整历史账单」链接：先关弹窗再跳转（同 hash 重复点击时关闭即可，避免"无反应"）
+      if (e.target.closest && e.target.closest('a[href^="#/students/"]')) {
+        hasUnsaved = false;
+        root.removeChild(mask);
+        return;
+      }
       const act = e.target.getAttribute && e.target.getAttribute('data-act');
       if (act === 'close' || e.target === mask) { tryCloseSettle(); return; }
       if (e.target.id === 's-save') { doSettleSave(); }
