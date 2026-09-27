@@ -27,6 +27,8 @@ App.pages.ledger = (function () {
     }).join('　');
   }
   function diffHtml(p) {
+    // 抹零：差额已核销，不显示为欠款
+    if (p.diffType === 'waive') return '<span class="chip chip-gray">抹零</span>';
     const d = Number(p.received) - Number(p.receivable);
     if (d === 0) return '<span class="hint">结清</span>';
     return d > 0
