@@ -439,10 +439,44 @@ App.store = (function () {
     return { courseId, month, shouldDays, rows };
   }
   // 余额：Σ(实收 − 应收)，抹零(waive)核销不计
+  // 账户余额：按月聚合。月已收合计 − 月应收。
+  // 月应收取「该月最后一条 settle 的 receivable」快照（同月多次结账共享，避免重复计入）；
+  // 抹零(waive)记账整体核销（该月视为结清，应收按核销后实收计）；
+  // 未结账但有出勤的月份：应收已产生 → 按动态 monthlyReceivable 计为欠费（用户新增学生 8 月全勤未缴费即显示欠费）；
+  // 预收/退费月无 settle 且无出勤时应收为 0，仅计实收。
   function balance(studentId) {
-    return data.payments
+    const months = {};
+    data.payments
       .filter(p => p.studentId === studentId && p.diffType !== 'waive')
-      .reduce((sum, p) => sum + (Number(p.received) - Number(p.receivable)), 0);
+      .forEach(p => {
+        const m = p.month || '';
+        const mm = months[m] || (months[m] = { rec: 0, snaps: [] });
+        mm.rec += Number(p.received);
+        if (p.type === 'settle') mm.snaps.push(p);
+      });
+    let sum = 0;
+    Object.keys(months).forEach(m => {
+      const mm = months[m];
+      const last = mm.snaps.length ? mm.snaps[mm.snaps.length - 1] : null;
+      sum += mm.rec - (last ? Number(last.receivable) : 0);
+    });
+    // 结账过的月份集合（含抹零 settle：抹零月应收已核销，不再计动态应收）
+    const settled = new Set(
+      data.payments
+        .filter(p => p.studentId === studentId && p.type === 'settle')
+        .map(p => p.month || '')
+    );
+    // 未结账但有出勤的月份：应收已产生 → 计入欠费
+    data.attendances
+      .filter(a => a.studentId === studentId)
+      .forEach(a => {
+        const m = a.date.slice(0, 7);
+        if (!settled.has(m)) {
+          settled.add(m);
+          sum -= monthlyReceivable(studentId, m);
+        }
+      });
+    return sum;
   }
   function studentPayments(studentId) {
     return data.payments
