@@ -77,7 +77,7 @@ App.pages.overview = (function () {
           (debtors.length ? ' <span class="chip chip-red">' + debtors.length + ' 人</span>' : '') + '</div>' +
         (debtors.length === 0
           ? '<p class="hint" style="margin:0;">没有欠费学生，全部结清。</p>'
-          : '<div class="table-wrap"><table class="list">' +
+          : '<div class="table-wrap" id="debt-list"><table class="list">' +
             '<colgroup><col style="width:30%"><col style="width:30%"><col style="width:40%"></colgroup>' +
             '<thead><tr><th>学生</th><th>欠费</th><th>本月应收</th></tr></thead><tbody>' +
             debtors.map(d =>
@@ -90,9 +90,9 @@ App.pages.overview = (function () {
             '<p class="hint" style="margin:8px 0 0;">欠费 = 累计应收 − 实收（抹零已核销不计）。点行可查看该生账单。</p>') +
       '</div>';
 
-    // 欠费行 → 学生详情（hash 路由接管跳转）
+    // 欠费行 → 学生详情（限定在概览页自身的表格内，避免委托绑定在共享容器 #view 上泄漏到其他页面）
     el.addEventListener('click', function (e) {
-      const tr = e.target.closest('tr[data-sid]');
+      const tr = e.target.closest('#debt-list tr[data-sid]');
       if (tr) location.hash = '#/students/' + tr.dataset.sid;
     });
   }
