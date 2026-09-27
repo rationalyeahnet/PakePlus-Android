@@ -77,7 +77,7 @@ App.pages.student = (function () {
         '<div class="stat"><div class="k">本月出勤率</div><div class="v ' + (rate !== null && rate < 60 ? 'money-neg' : '') + '">' + (rate === null ? '—' : rate + '%') + '</div></div>' +
         '<div class="stat"><div class="k">' + Utils.monthShort(month) + ' 应收</div><div class="v money">' + Utils.fmtMoney(receivable) + '</div></div>' +
         '<div class="stat"><div class="k">账户余额</div><div class="v ' + (bal < 0 ? 'money-neg' : bal > 0 ? 'money-pos' : '') + '">' +
-          (bal === 0 ? Utils.fmtMoney(0) : (bal < 0 ? '-' : '+') + Utils.fmtMoney(Math.abs(bal))) +
+          (bal === 0 ? Utils.fmtMoney(0) : (bal < 0 ? '欠 ' : '余 ') + Utils.fmtMoney(Math.abs(bal))) +
         '</div></div>' +
       '</div>' +
 
@@ -315,7 +315,7 @@ App.pages.student = (function () {
     const pays = store.studentPayments(studentId);
     if (pays.length === 0) return '<div class="hint">还没有收费记录</div>';
     return '<div class="table-wrap"><table class="list"><colgroup>' +
-      '<col style="width:14%"><col style="width:10%"><col style="width:16%"><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:10%">' +
+      '<col style="width:12%"><col style="width:14%"><col style="width:15%"><col style="width:15%"><col style="width:17%"><col style="width:17%"><col style="width:10%">' +
       '</colgroup><thead><tr><th>月份</th><th>类型</th><th>应收</th><th>实收</th><th>差额</th><th>备注</th><th></th></tr></thead><tbody>' +
       pays.map(p => {
         const diff = p.received - p.receivable;
